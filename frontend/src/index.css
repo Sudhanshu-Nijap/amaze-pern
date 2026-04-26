@@ -1,0 +1,168 @@
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+}
+
+.title {
+    font-family: "Courgette", serif;
+    font-weight: 300;
+    font-style: normal;
+}
+
+.title-clamp {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+    word-wrap: break-word;
+    max-height: 4.5rem;
+    text-align: justify;
+    height: 70px;
+}
+
+.best-text {
+    color: #0062FF;
+}
+
+.sub-text {
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 1.2rem;
+}
+
+.text-orange {
+    color: #FF6200;
+}
+
+/* Custom Button Styling */
+.btn-orange {
+    background-color: #FF6200 !important;
+    color: white !important;
+    border: none !important;
+    padding: 10px 20px !important;
+    border-radius: 25px !important;
+    font-size: 1rem !important;
+    font-weight: bold !important;
+    transition: all 0.3s ease;
+    text-decoration: none !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-orange:hover {
+    background-color: #e65c00 !important;
+    color: white !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+    text-decoration: none !important;
+}
+
+.btn-orange:focus,
+.btn-orange:active {
+    background-color: #d45500 !important;
+    color: white !important;
+    box-shadow: none !important;
+    transform: translateY(0);
+}
+
+.user {
+    padding: 10px 20px;
+}
+
+.front {
+    min-height: auto;
+}
+
+@media (max-width: 768px) {
+    .front {
+        min-height: auto;
+    }
+}
+
+.hero-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    text-align: center;
+}
+
+.hero-text {
+    font-size: clamp(1.8rem, 5vw, 3rem);
+    font-weight: bold;
+}
+
+.hero-subtext {
+    font-size: clamp(1rem, 3vw, 1.5rem);
+    max-width: 600px;
+    margin-top: 10px;
+}
+
+.hero-image {
+    width: 90%;
+    max-width: 1200px;
+    height: auto;
+}
+
+.navbar {
+    padding: 0.6rem 1rem;
+}
+
+.title {
+    font-size: 1.9rem;
+    font-weight: bold;
+}
+
+@media (max-width: 992px) {
+    .hero-text {
+        font-size: clamp(1.6rem, 4vw, 2.5rem);
+    }
+    .hero-subtext {
+        font-size: clamp(1rem, 3vw, 1.4rem);
+    }
+    .col-12.col-md-4, .col-12.col-md-8 {
+        order: unset;
+    }
+    .hero-image {
+        width: 100%;
+        max-width: 100%;
+    }
+}
+
+.line {
+    flex: 1;
+    height: 1px;
+    background-color: #CACACA;
+}
+
+.search-container {
+    max-width: 500px;
+}
+
+/* Animations that we kept from before */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+}
+
+.scrollbar-hidden {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}

@@ -23,7 +23,7 @@ export default function Home() {
     fetchHomeData();
 
     // Connect to socket for real-time updates
-    const socket = io('http://localhost:5000');
+    const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000');
     socket.on('dataUpdated', (data) => {
       if (data.type === 'daily') {
         console.log("Real-time update received: daily");

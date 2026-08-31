@@ -9,6 +9,20 @@ export default function SearchResult() {
   const [targetPrice, setTargetPrice] = useState('');
   const location = useLocation();
 
+  const getNumericPrice = (val) => {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    const cleaned = String(val).replace(/,/g, '').replace(/[^0-9.]/g, '').replace(/\.$/, '');
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
+  };
+
+  const formatPrice = (val) => {
+    const num = getNumericPrice(val);
+    if (!num) return "0";
+    return num.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const url = params.get('url');
@@ -49,17 +63,26 @@ export default function SearchResult() {
   };
 
   const applyDiscount = (percent) => {
-    if (product?.current_price) {
-      const price = parseFloat(product.current_price);
-      setTargetPrice((price - (price * percent) / 100).toFixed(2));
+    const price = getNumericPrice(product?.current_price);
+    if (price > 0) {
+      if (percent === 0.01) {
+        // Any Price Drop: ₹1 below current price
+        setTargetPrice(Math.max(1, price - 1).toFixed(2));
+      } else {
+        const discounted = price - (price * percent) / 100;
+        setTargetPrice(discounted.toFixed(2));
+      }
     }
   };
 
   const handleTrack = async () => {
-    if (!targetPrice) {
-      alert("Please set a desired price");
+    const cleanTarget = getNumericPrice(targetPrice);
+    if (cleanTarget <= 0) {
+      alert("Please enter a valid desired price");
       return;
     }
+    const cleanCurrent = getNumericPrice(product.current_price);
+
     try {
       const payload = {
         asin: product.asin,
@@ -68,8 +91,8 @@ export default function SearchResult() {
         amazon_url: product.amazon_url || product.url,
         rating: product.rating,
         stock_status: product.stock_status,
-        desired_price: parseFloat(targetPrice),
-        current_price: parseFloat(product.current_price)
+        desired_price: cleanTarget,
+        current_price: cleanCurrent
       };
       await api.post('/products/track', payload);
       alert('✅ Product successfully added to your watchlist!');
@@ -155,7 +178,7 @@ export default function SearchResult() {
                       <span className="fs-3 me-3">👍</span>
                       <div>
                         <strong>Good Value Deal</strong>
-                        <div className="small">The current price (₹{product.current_price}) is below the historical average of ₹{analysis.avg_price}.</div>
+                        <div className="small">The current price (₹{formatPrice(product.current_price)}) is below the historical average of ₹{formatPrice(analysis.avg_price)}.</div>
                       </div>
                     </div>
                   )}
@@ -165,7 +188,7 @@ export default function SearchResult() {
                       <span className="fs-3 me-3">⚠️</span>
                       <div>
                         <strong>Price is Higher than Usual</strong>
-                        <div className="small">Current price is above the historical average (₹{analysis.avg_price}). Set a price watch to get notified when it drops.</div>
+                        <div className="small">Current price is above the historical average (₹{formatPrice(analysis.avg_price)}). Set a price watch to get notified when it drops.</div>
                       </div>
                     </div>
                   )}
@@ -175,19 +198,19 @@ export default function SearchResult() {
                     <div className="col-4">
                       <div className="p-3 bg-light rounded-3">
                         <small className="text-muted d-block text-uppercase fw-bold" style={{ fontSize: '0.7rem' }}>All-Time Low</small>
-                        <span className="fs-5 fw-bold text-success">₹{analysis.min_price}</span>
+                        <span className="fs-5 fw-bold text-success">₹{formatPrice(analysis.min_price)}</span>
                       </div>
                     </div>
                     <div className="col-4">
                       <div className="p-3 bg-light rounded-3">
                         <small className="text-muted d-block text-uppercase fw-bold" style={{ fontSize: '0.7rem' }}>Average Price</small>
-                        <span className="fs-5 fw-bold text-secondary">₹{analysis.avg_price}</span>
+                        <span className="fs-5 fw-bold text-secondary">₹{formatPrice(analysis.avg_price)}</span>
                       </div>
                     </div>
                     <div className="col-4">
                       <div className="p-3 bg-light rounded-3">
                         <small className="text-muted d-block text-uppercase fw-bold" style={{ fontSize: '0.7rem' }}>All-Time High</small>
-                        <span className="fs-5 fw-bold text-danger">₹{analysis.max_price}</span>
+                        <span className="fs-5 fw-bold text-danger">₹{formatPrice(analysis.max_price)}</span>
                       </div>
                     </div>
                   </div>
@@ -211,22 +234,22 @@ export default function SearchResult() {
                       </thead>
                       <tbody>
                         {product.price_history.map((entry, index) => {
-                          const entryPrice = parseFloat(entry.price);
-                          const currentPrice = parseFloat(product.current_price);
+                          const entryPrice = getNumericPrice(entry.price);
+                          const currentPrice = getNumericPrice(product.current_price);
                           const diff = currentPrice - entryPrice;
 
                           return (
                             <tr key={entry.id || index}>
                               <td className="text-muted">{new Date(entry.timestamp).toLocaleDateString()}</td>
-                              <td className="fw-bold text-dark">₹{entryPrice}</td>
+                              <td className="fw-bold text-dark">₹{formatPrice(entryPrice)}</td>
                               <td>
-                                {diff < 0 ? (
+                                {diff < -0.01 ? (
                                   <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-2 py-1">
-                                    ▼ ₹{Math.abs(diff).toFixed(2)} cheaper now
+                                    ▼ ₹{formatPrice(Math.abs(diff))} cheaper now
                                   </span>
-                                ) : diff > 0 ? (
+                                ) : diff > 0.01 ? (
                                   <span className="badge bg-danger bg-opacity-10 text-danger rounded-pill px-2 py-1">
-                                    ▲ ₹{diff.toFixed(2)} higher now
+                                    ▲ ₹{formatPrice(diff)} higher now
                                   </span>
                                 ) : (
                                   <span className="badge bg-secondary bg-opacity-10 text-secondary rounded-pill px-2 py-1">
@@ -249,7 +272,7 @@ export default function SearchResult() {
               <div className="card border-0 shadow-sm rounded-4 p-4 bg-white sticky-top" style={{ top: '2rem' }}>
                 <div className="text-center pb-3 border-bottom">
                   <small className="text-muted text-uppercase fw-bold">Live Amazon Price</small>
-                  <h2 className="fw-bold text-success mt-1 mb-0">₹{product.current_price}</h2>
+                  <h2 className="fw-bold text-success mt-1 mb-0">₹{formatPrice(product.current_price)}</h2>
                 </div>
 
                 <div className="py-3">
@@ -276,7 +299,7 @@ export default function SearchResult() {
                     <input 
                       type="number" 
                       className="form-control border-start-0 rounded-end-pill" 
-                      placeholder="e.g. 1999" 
+                      placeholder="e.g. 75000" 
                       value={targetPrice}
                       onChange={(e) => setTargetPrice(e.target.value)}
                     />

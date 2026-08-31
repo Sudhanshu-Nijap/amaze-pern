@@ -1,6 +1,14 @@
 const { query } = require("../services/db.service");
 const scraperService = require("../services/scraper.service");
 
+const parseNumericPrice = (val) => {
+  if (typeof val === "number") return val;
+  if (!val) return 0;
+  const cleaned = String(val).replace(/,/g, "").replace(/[^0-9.]/g, "").replace(/\.$/, "");
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
+};
+
 // Matches 'amazon_product_view' (POST /search/)
 const searchProduct = async (req, res) => {
   const { url: userInput } = req.body;
@@ -13,6 +21,10 @@ const searchProduct = async (req, res) => {
 
     const productData = await scraperService.scrapeProduct(url);
     if (productData && productData.error) return res.status(400).json(productData);
+
+    if (productData && productData.current_price) {
+      productData.current_price = parseNumericPrice(productData.current_price);
+    }
 
     res.status(200).json(productData);
   } catch (error) {
@@ -81,6 +93,10 @@ const getResult = async (req, res) => {
       try {
         const productData = await scraperService.scrapeProduct(url);
         if (productData && productData.error) return res.status(400).json({ error: productData.error });
+
+        if (productData && productData.current_price) {
+          productData.current_price = parseNumericPrice(productData.current_price);
+        }
 
         return res.status(200).json({
           ...productData,

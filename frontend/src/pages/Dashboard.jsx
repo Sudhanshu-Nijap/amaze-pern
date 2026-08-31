@@ -4,6 +4,13 @@ import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { io } from 'socket.io-client';
 
+const formatPrice = (val) => {
+  if (val === undefined || val === null) return "0";
+  const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/,/g, '').replace(/[^0-9.]/g, '').replace(/\.$/, ''));
+  if (isNaN(num)) return "0";
+  return num.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+};
+
 export default function Dashboard() {
   const [trackedProducts, setTrackedProducts] = useState([]);
   const [filter, setFilter] = useState('all');
@@ -168,20 +175,20 @@ export default function Dashboard() {
                       </Link>
                       <div className="flex-grow-1 min-w-0">
                         <div className="d-flex align-items-baseline gap-2">
-                          <span className="fs-5 fw-bold text-dark">₹{product.current_price}</span>
+                          <span className="fs-5 fw-bold text-dark">₹{formatPrice(product.current_price)}</span>
                           {isDrop && (
                             <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-2 py-1 small fw-semibold">
-                              ↓ ₹{Math.abs(a.price_change)} ({Math.abs(a.price_change_percent)}%)
+                              ↓ ₹{formatPrice(Math.abs(a.price_change))} ({Math.abs(a.price_change_percent)}%)
                             </span>
                           )}
                           {isIncrease && (
                             <span className="badge bg-danger bg-opacity-10 text-danger rounded-pill px-2 py-1 small fw-semibold">
-                              ↑ ₹{a.price_change} (+{a.price_change_percent}%)
+                              ↑ ₹{formatPrice(a.price_change)} (+{a.price_change_percent}%)
                             </span>
                           )}
                         </div>
                         <div className="text-muted small">
-                          Target: <span className="fw-semibold text-dark">₹{target_price}</span>
+                          Target: <span className="fw-semibold text-dark">₹{formatPrice(target_price)}</span>
                           {targetMet && <span className="text-success ms-1 fw-bold">✓ Met</span>}
                         </div>
                       </div>

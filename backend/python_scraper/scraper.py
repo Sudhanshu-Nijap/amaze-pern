@@ -65,7 +65,22 @@ def amazon_scraper(url):
 
         # Extract product price
         price_tag = soup.find("span", class_="a-price-whole")
-        price = price_tag.get_text(strip=True) if price_tag else "Price not available"
+        fraction_tag = soup.find("span", class_="a-price-fraction")
+        if price_tag:
+            whole = re.sub(r"[^\d]", "", price_tag.get_text(strip=True))
+            fraction = re.sub(r"[^\d]", "", fraction_tag.get_text(strip=True)) if fraction_tag else ""
+            if fraction:
+                price = f"{whole}.{fraction}"
+            else:
+                price = whole
+        else:
+            # Fallback to other price selectors (e.g. .a-offscreen, #priceblock_ourprice, #priceblock_dealprice)
+            offscreen = soup.find("span", class_="a-offscreen")
+            if offscreen:
+                price_clean = re.sub(r"[^\d.]", "", offscreen.get_text(strip=True).replace(",", ""))
+                price = price_clean.rstrip(".") if price_clean else "Price not available"
+            else:
+                price = "Price not available"
 
         # Extract product rating
         rating_tag = soup.find("span", {"class": "a-icon-alt"})

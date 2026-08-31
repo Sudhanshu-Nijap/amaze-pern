@@ -41,7 +41,7 @@ const register = async (req, res) => {
     res.status(201).json({ message: "Registration successful", user: userResponse });
   } catch (error) {
     console.error("Registration error:", error);
-    res.status(400).json({ error: error.message });
+    res.status(500).json({ error: error.message || "Registration failed due to a server error." });
   }
 };
 
@@ -58,13 +58,13 @@ const login = async (req, res) => {
     const dbUser = userRes.rows[0];
 
     if (!dbUser) {
-      return res.status(400).json({ error: "Invalid email or password." });
+      return res.status(401).json({ error: "Invalid email or password." });
     }
 
     // Verify password
     const isMatch = await bcrypt.compare(password, dbUser.password);
     if (!isMatch) {
-      return res.status(400).json({ error: "Invalid email or password." });
+      return res.status(401).json({ error: "Invalid email or password." });
     }
 
     // Update last login
@@ -97,7 +97,7 @@ const login = async (req, res) => {
     res.status(200).json(data);
   } catch (error) {
     console.error("Login error:", error);
-    res.status(400).json({ error: error.message });
+    res.status(500).json({ error: error.message || "Login failed due to a server error." });
   }
 };
 
@@ -106,7 +106,7 @@ const logout = async (req, res) => {
     // With stateless JWT, client deletes the token. Just return success.
     res.status(200).json({ message: "Logout successful" });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(500).json({ error: error.message || "Logout failed." });
   }
 };
 

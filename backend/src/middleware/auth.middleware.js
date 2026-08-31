@@ -1,4 +1,5 @@
-const supabase = require("../services/supabase.service");
+const jwt = require("jsonwebtoken");
+const { query } = require("../services/db.service");
 
 const requireAuth = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -9,35 +10,29 @@ const requireAuth = async (req, res, next) => {
 
   const token = authHeader.split(" ")[1];
 
-  let retries = 3;
-  let delay = 1000;
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "super_secret_jwt_key_for_amaze_pern_stack_app");
+    
+    const dbUserRes = await query(
+      "SELECT id, email, is_active FROM scraper_customuser WHERE id = $1 LIMIT 1",
+      [decoded.id]
+    );
 
-  while (retries > 0) {
-    try {
-      const { data: { user }, error } = await supabase.auth.getUser(token);
-
-      if (error || !user) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-
-      const { data: dbUser } = await supabase
-        .from("scraper_customuser")
-        .select("id")
-        .eq("email", user.email)
-        .single();
-
-      req.user = { ...user, djangoId: dbUser?.id };
-      return next();
-    } catch (error) {
-      retries -= 1;
-      if (retries === 0) {
-        console.error("Auth Middleware Error after retries:", error.message);
-        return res.status(503).json({ error: "Authentication service temporarily unavailable. Please check your internet connection." });
-      }
-      console.log(`Retrying authentication (${3 - retries}/3)...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-      delay *= 2;
+    const dbUser = dbUserRes.rows[0];
+    if (!dbUser || !dbUser.is_active) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
+
+    req.user = {
+      id: dbUser.id,
+      email: dbUser.email,
+      djangoId: dbUser.id
+    };
+    
+    return next();
+  } catch (error) {
+    console.error("Auth Middleware Error:", error.message);
+    return res.status(401).json({ error: "Unauthorized or invalid token" });
   }
 };
 

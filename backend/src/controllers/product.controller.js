@@ -1,4 +1,4 @@
-const supabase = require("../services/supabase.service");
+const { query } = require("../services/db.service");
 const scraperService = require("../services/scraper.service");
 
 // Matches 'amazon_product_view' (POST /search/)
@@ -7,14 +7,13 @@ const searchProduct = async (req, res) => {
   if (!userInput) return res.status(400).json({ error: "Amazon URL is required" });
 
   try {
-    // ASIN or URL validation (Django logic)
+    // ASIN or URL validation
     const asinPattern = /^[A-Z0-9]{10}$/;
     const url = asinPattern.test(userInput) ? `https://www.amazon.in/dp/${userInput}` : userInput;
 
     const productData = await scraperService.scrapeProduct(url);
     if (productData && productData.error) return res.status(400).json(productData);
 
-    // This view in Django doesn't save to DB, it just returns data
     res.status(200).json(productData);
   } catch (error) {
     res.status(500).json({ error: "Scraping failed: " + error.message });
@@ -28,19 +27,16 @@ const getResult = async (req, res) => {
 
   try {
     // Fetch product details from DB if available
-    const { data: product } = await supabase
-      .from("scraper_product")
-      .select("*")
-      .eq("amazon_url", url)
-      .single();
+    const productRes = await query("SELECT * FROM scraper_product WHERE amazon_url = $1 LIMIT 1", [url]);
+    const product = productRes.rows[0];
 
     if (product) {
       // Fetch price history
-      const { data: priceHistory } = await supabase
-        .from("scraper_pricehistory")
-        .select("*")
-        .eq("product_id", product.id)
-        .order("timestamp", { ascending: true });
+      const priceRes = await query(
+        "SELECT * FROM scraper_pricehistory WHERE product_id = $1 ORDER BY timestamp ASC",
+        [product.id]
+      );
+      const priceHistory = priceRes.rows;
 
       return res.status(200).json({
         ...product,
@@ -73,9 +69,8 @@ const getBestsellers = async (req, res) => {
 
   try {
     // Check if products exist in DB
-    const { count: productCount, error: countError } = await supabase
-      .from("scraper_bestseller")
-      .select("*", { count: "exact", head: true });
+    const countRes = await query("SELECT COUNT(*) FROM scraper_bestseller");
+    const productCount = parseInt(countRes.rows[0].count, 10);
 
     if (productCount === 0) {
       console.log("Database empty. Scraping new products...");
@@ -84,29 +79,27 @@ const getBestsellers = async (req, res) => {
         
         // Save scraped data efficiently
         if (scrapedProducts && scrapedProducts.length > 0) {
-          await supabase.from("scraper_bestseller").insert(
-            scrapedProducts.map(p => ({
-              title: p.title,
-              current_price: p.current_price,
-              image_url: p.image_url,
-              product_url: p.product_url
-            }))
-          );
+          for (const p of scrapedProducts) {
+            await query(
+              `INSERT INTO scraper_bestseller (title, current_price, image_url, product_url)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (product_url) DO UPDATE 
+               SET title = EXCLUDED.title, current_price = EXCLUDED.current_price, image_url = EXCLUDED.image_url, scraped_at = CURRENT_TIMESTAMP`,
+              [p.title, p.current_price, p.image_url, p.product_url]
+            );
+          }
         }
       } catch (scrapeError) {
         console.error("Initial Bestseller Scrape Failed:", scrapeError.message);
-        // Continue to return empty data from DB instead of 500
       }
     }
 
-    const { data, error } = await supabase
-      .from("scraper_bestseller")
-      .select("*")
-      .order("scraped_at", { ascending: false })
-      .range(start, start + count - 1);
+    const dataRes = await query(
+      "SELECT * FROM scraper_bestseller ORDER BY scraped_at DESC LIMIT $1 OFFSET $2",
+      [count, start]
+    );
 
-    if (error) throw error;
-    res.status(200).json(data);
+    res.status(200).json(dataRes.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -118,9 +111,8 @@ const getTodayDeals = async (req, res) => {
   const count = 20;
 
   try {
-    const { count: productCount } = await supabase
-      .from("scraper_todaydeals")
-      .select("*", { count: "exact", head: true });
+    const countRes = await query("SELECT COUNT(*) FROM scraper_todaydeals");
+    const productCount = parseInt(countRes.rows[0].count, 10);
 
     if (productCount === 0) {
       console.log("Database empty. Scraping new Today's Deals...");
@@ -128,28 +120,27 @@ const getTodayDeals = async (req, res) => {
         const scrapedProducts = await scraperService.getTodayDeals(0, 20);
         
         if (scrapedProducts && scrapedProducts.length > 0) {
-          await supabase.from("scraper_todaydeals").insert(
-            scrapedProducts.map(p => ({
-              title: p.title,
-              current_price: p.current_price,
-              image_url: p.image_url,
-              product_url: p.product_url
-            }))
-          );
+          for (const p of scrapedProducts) {
+            await query(
+              `INSERT INTO scraper_todaydeals (title, current_price, image_url, product_url)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (product_url) DO UPDATE 
+               SET title = EXCLUDED.title, current_price = EXCLUDED.current_price, image_url = EXCLUDED.image_url, scraped_at = CURRENT_TIMESTAMP`,
+              [p.title, p.current_price, p.image_url, p.product_url]
+            );
+          }
         }
       } catch (scrapeError) {
         console.error("Initial Today's Deals Scrape Failed:", scrapeError.message);
       }
     }
 
-    const { data, error } = await supabase
-      .from("scraper_todaydeals")
-      .select("*")
-      .order("scraped_at", { ascending: false })
-      .range(start, start + count - 1);
+    const dataRes = await query(
+      "SELECT * FROM scraper_todaydeals ORDER BY scraped_at DESC LIMIT $1 OFFSET $2",
+      [count, start]
+    );
 
-    if (error) throw error;
-    res.status(200).json(data);
+    res.status(200).json(dataRes.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -164,75 +155,75 @@ const trackProduct = async (req, res) => {
 
   try {
     // 1. Get or Create Product
-    const { data: existingProduct } = await supabase
-      .from("scraper_product")
-      .select("*")
-      .eq("asin", asin)
-      .single();
+    const existingRes = await query("SELECT * FROM scraper_product WHERE asin = $1 LIMIT 1", [asin]);
+    let product = existingRes.rows[0];
 
-    let product = existingProduct;
+    const cleanPrice = parseFloat(String(current_price).replace(/[^0-9.]/g, '')) || 0;
 
     if (!product) {
-      const { data: newProduct, error: insertError } = await supabase
-        .from("scraper_product")
-        .insert({
+      const insertRes = await query(
+        `INSERT INTO scraper_product (asin, title, image_url, current_price, rating, stock_status, amazon_url, last_scraped)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING *`,
+        [
           asin,
           title,
           image_url,
-          current_price: parseFloat(String(current_price).replace(/[^0-9.]/g, '')) || 0,
-          rating: rating || "0 out of 5 stars",
+          cleanPrice,
+          rating || "0 out of 5 stars",
           stock_status,
           amazon_url,
-          last_scraped: new Date()
-        })
-        .select()
-        .single();
-      
-      if (insertError) throw insertError;
-      product = newProduct;
+          new Date()
+        ]
+      );
+      product = insertRes.rows[0];
     } else {
       // Update current price if changed
-      if (product.current_price !== parseFloat(current_price)) {
-        await supabase
-          .from("scraper_product")
-          .update({ current_price: parseFloat(current_price) })
-          .eq("id", product.id);
+      if (parseFloat(product.current_price) !== cleanPrice) {
+        const updateRes = await query(
+          "UPDATE scraper_product SET current_price = $1 WHERE id = $2 RETURNING *",
+          [cleanPrice, product.id]
+        );
+        product = updateRes.rows[0];
       }
     }
 
     // 2. Add product to TrackedProduct
-    const { data: existingTracked } = await supabase
-      .from("scraper_trackedproduct")
-      .select("*")
-      .eq("user_id", user.djangoId)
-      .eq("product_id", product.id)
-      .single();
-    
     if (!user.djangoId) throw new Error("User record not found in database.");
 
+    const trackedRes = await query(
+      "SELECT * FROM scraper_trackedproduct WHERE user_id = $1 AND product_id = $2 LIMIT 1",
+      [user.djangoId, product.id]
+    );
+    const existingTracked = trackedRes.rows[0];
+    
     if (!existingTracked) {
-      await supabase
-        .from("scraper_trackedproduct")
-        .insert({
-          user_id: user.djangoId,
-          product_id: product.id,
-          target_price: parseFloat(desired_price),
-          added_at: new Date()
-        });
-    } else if (existingTracked.target_price !== parseFloat(desired_price)) {
-      await supabase
-        .from("scraper_trackedproduct")
-        .update({ target_price: parseFloat(desired_price) })
-        .eq("id", existingTracked.id);
+      await query(
+        "INSERT INTO scraper_trackedproduct (user_id, product_id, target_price, added_at) VALUES ($1, $2, $3, $4)",
+        [
+          user.djangoId,
+          product.id,
+          parseFloat(desired_price),
+          new Date()
+        ]
+      );
+    } else if (parseFloat(existingTracked.target_price) !== parseFloat(desired_price)) {
+      await query(
+        "UPDATE scraper_trackedproduct SET target_price = $1 WHERE id = $2",
+        [parseFloat(desired_price), existingTracked.id]
+      );
     }
 
-    // 3. Save Price History (Django logic)
-    await supabase.from("scraper_pricehistory").insert({
-      user_id: user.djangoId,
-      product_id: product.id,
-      price: parseFloat(desired_price),
-      timestamp: new Date()
-    });
+    // 3. Save Price History
+    await query(
+      "INSERT INTO scraper_pricehistory (user_id, product_id, price, timestamp) VALUES ($1, $2, $3, $4)",
+      [
+        user.djangoId,
+        product.id,
+        parseFloat(desired_price),
+        new Date()
+      ]
+    );
 
     res.status(200).json({ success: true });
   } catch (error) {
@@ -247,13 +238,35 @@ const getTrackedProducts = async (req, res) => {
   if (!user || !user.djangoId) return res.status(401).json({ error: "Unauthorized" });
 
   try {
-    const { data, error } = await supabase
-      .from("scraper_trackedproduct")
-      .select("*, scraper_product(*)")
-      .eq("user_id", user.djangoId);
+    const resRows = await query(
+      `SELECT t.*, 
+              p.id as p_id, p.asin, p.title, p.image_url, p.current_price, p.rating, p.stock_status, p.amazon_url, p.last_scraped
+       FROM scraper_trackedproduct t
+       JOIN scraper_product p ON t.product_id = p.id
+       WHERE t.user_id = $1`,
+      [user.djangoId]
+    );
 
-    if (error) throw error;
-    res.status(200).json(data.map(item => ({ ...item, product: item.scraper_product })));
+    const data = resRows.rows.map(row => ({
+      id: row.id,
+      user_id: row.user_id,
+      product_id: row.product_id,
+      target_price: row.target_price,
+      added_at: row.added_at,
+      product: {
+        id: row.p_id,
+        asin: row.asin,
+        title: row.title,
+        image_url: row.image_url,
+        current_price: row.current_price,
+        rating: row.rating,
+        stock_status: row.stock_status,
+        amazon_url: row.amazon_url,
+        last_scraped: row.last_scraped
+      }
+    }));
+
+    res.status(200).json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -266,16 +279,15 @@ const untrackProduct = async (req, res) => {
   if (!user || !user.djangoId) return res.status(401).json({ error: "Unauthorized" });
 
   try {
-    const { data: product } = await supabase.from("scraper_product").select("id").eq("asin", asin).single();
+    const prodRes = await query("SELECT id FROM scraper_product WHERE asin = $1 LIMIT 1", [asin]);
+    const product = prodRes.rows[0];
     if (!product) return res.status(404).json({ error: "Product not found" });
 
-    const { error } = await supabase
-      .from("scraper_trackedproduct")
-      .delete()
-      .eq("user_id", user.djangoId)
-      .eq("product_id", product.id);
+    await query(
+      "DELETE FROM scraper_trackedproduct WHERE user_id = $1 AND product_id = $2",
+      [user.djangoId, product.id]
+    );
 
-    if (error) throw error;
     res.status(200).json({ success: true, message: "Product removed successfully" });
   } catch (error) {
     res.status(500).json({ error: error.message });

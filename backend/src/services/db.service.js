@@ -1,3 +1,5 @@
+const { Pool } = require("pg");
+
 let rawConnectionString = process.env.DATABASE_URL || "";
 const connectionString = rawConnectionString.trim().replace(/^["']|["']$/g, "");
 

@@ -75,6 +75,12 @@ export default function SearchResult() {
     }
   };
 
+  const setSuggestedPrice = () => {
+    if (analysis.suggested_target_price) {
+      setTargetPrice(analysis.suggested_target_price.toFixed(2));
+    }
+  };
+
   const handleTrack = async () => {
     const cleanTarget = getNumericPrice(targetPrice);
     if (cleanTarget <= 0) {
@@ -105,12 +111,14 @@ export default function SearchResult() {
     return (
       <div className="container py-5 text-center">
         <div className="spinner-border spinner-border-sm text-secondary" role="status"></div>
-        <p className="text-muted small mt-2">Loading product details and price trends...</p>
+        <p className="text-muted small mt-2">Analyzing Amazon product and price prediction data...</p>
       </div>
     );
   }
 
   const analysis = product?.price_analysis || {};
+  const isBuyNow = analysis.verdict === 'BUY_NOW';
+  const isWait = analysis.verdict === 'WAIT_FOR_DROP';
 
   return (
     <div className="container py-4" style={{ maxWidth: '1100px' }}>
@@ -154,16 +162,76 @@ export default function SearchResult() {
                 />
               </div>
 
-              {/* Price Insights */}
+              {/* Predictive Buy Engine & Deal Score Card */}
               {analysis && (analysis.min_price || analysis.avg_price) && (
-                <div className="card border rounded-3 p-4 bg-white mb-4" style={{ borderColor: '#e5e7eb' }}>
-                  <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h6 className="fw-semibold mb-0 text-dark">Price Trend & Summary</h6>
-                    <span className="text-muted small">Historical Trend</span>
+                <div className="card border rounded-3 p-4 bg-white mb-4 shadow-sm" style={{ borderColor: '#e2e8f0' }}>
+                  {/* Verdict & Score Header */}
+                  <div className="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-3 border-bottom gap-2">
+                    <div>
+                      <small className="text-secondary d-block text-uppercase fw-semibold" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>
+                        Predictive Buy Verdict
+                      </small>
+                      <div className="d-flex align-items-center gap-2 mt-1">
+                        {isBuyNow && (
+                          <span className="badge bg-success px-3 py-1.5 rounded-2 fs-6 fw-bold">
+                            BUY NOW
+                          </span>
+                        )}
+                        {isWait && (
+                          <span className="badge bg-warning text-dark px-3 py-1.5 rounded-2 fs-6 fw-bold">
+                            WAIT FOR DROP
+                          </span>
+                        )}
+                        {!isBuyNow && !isWait && (
+                          <span className="badge bg-secondary px-3 py-1.5 rounded-2 fs-6 fw-bold">
+                            FAIR VALUE
+                          </span>
+                        )}
+                        <span className="text-muted small">
+                          ({analysis.drop_probability}% chance of lower price)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Deal Score Badge */}
+                    <div className="text-end">
+                      <small className="text-secondary d-block text-uppercase fw-semibold" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>
+                        Deal Score
+                      </small>
+                      <span className={`fs-4 fw-bold ${analysis.deal_score >= 70 ? 'text-success' : analysis.deal_score <= 40 ? 'text-danger' : 'text-primary'}`}>
+                        {analysis.deal_score || 50} <small className="text-muted fs-6 font-normal">/ 100</small>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Verdict Explanation */}
+                  <p className="text-dark small mb-3">
+                    {analysis.verdict_reason}
+                  </p>
+
+                  {/* Price Spectrum Position Slider */}
+                  <div className="mb-4 pt-1">
+                    <div className="d-flex justify-content-between small text-secondary mb-1" style={{ fontSize: '0.75rem' }}>
+                      <span>All-Time Low: <strong className="text-success">₹{formatPrice(analysis.min_price)}</strong></span>
+                      <span className="fw-medium text-dark">Price Position ({analysis.price_position_percent || 0}%)</span>
+                      <span>All-Time High: <strong className="text-danger">₹{formatPrice(analysis.max_price)}</strong></span>
+                    </div>
+
+                    <div className="progress" style={{ height: '8px', background: '#e2e8f0', borderRadius: '4px' }}>
+                      <div 
+                        className={`progress-bar ${isBuyNow ? 'bg-success' : isWait ? 'bg-danger' : 'bg-primary'}`} 
+                        role="progressbar" 
+                        style={{ width: `${Math.max(5, Math.min(100, analysis.price_position_percent || 50))}%` }}
+                      ></div>
+                    </div>
                   </div>
 
                   {/* Line Graph */}
-                  <div className="mb-4 pt-2">
+                  <div className="mb-3 pt-2">
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <h6 className="fw-semibold mb-0 text-dark" style={{ fontSize: '0.9rem' }}>Historical Price Movement</h6>
+                      <span className="text-muted small" style={{ fontSize: '0.75rem' }}>Volatility: {analysis.volatility || 'Low'}</span>
+                    </div>
                     <PriceChart 
                       history={product.price_history || []} 
                       currentPrice={product.current_price} 
@@ -171,42 +239,23 @@ export default function SearchResult() {
                     />
                   </div>
 
-                  {/* Recommendation Message */}
-                  {analysis.deal_advice === 'BEST_PRICE' && (
-                    <div className="alert alert-success border-0 rounded-2 p-3 mb-3 small">
-                      <strong>Lowest recorded price:</strong> This product is currently at or near its lowest recorded price.
-                    </div>
-                  )}
-
-                  {analysis.deal_advice === 'BELOW_AVERAGE' && (
-                    <div className="alert alert-info border-0 rounded-2 p-3 mb-3 small">
-                      <strong>Below average price:</strong> Current price (₹{formatPrice(product.current_price)}) is below the historical average of ₹{formatPrice(analysis.avg_price)}.
-                    </div>
-                  )}
-
-                  {analysis.deal_advice === 'ABOVE_AVERAGE' && (
-                    <div className="alert alert-warning border-0 rounded-2 p-3 mb-3 small">
-                      <strong>Above average price:</strong> Current price is higher than the historical average (₹{formatPrice(analysis.avg_price)}). Set a target price alert below.
-                    </div>
-                  )}
-
                   {/* 3 Metric Cards */}
-                  <div className="row text-center g-2 mt-1">
+                  <div className="row text-center g-2 mt-2">
                     <div className="col-4">
-                      <div className="p-3 bg-light rounded-2">
-                        <small className="text-muted d-block text-uppercase fw-semibold" style={{ fontSize: '0.65rem' }}>Lowest</small>
+                      <div className="p-2.5 bg-light rounded-2">
+                        <small className="text-secondary d-block text-uppercase fw-semibold" style={{ fontSize: '0.65rem' }}>Lowest</small>
                         <span className="fs-6 fw-bold text-success">₹{formatPrice(analysis.min_price)}</span>
                       </div>
                     </div>
                     <div className="col-4">
-                      <div className="p-3 bg-light rounded-2">
-                        <small className="text-muted d-block text-uppercase fw-semibold" style={{ fontSize: '0.65rem' }}>Average</small>
-                        <span className="fs-6 fw-bold text-secondary">₹{formatPrice(analysis.avg_price)}</span>
+                      <div className="p-2.5 bg-light rounded-2">
+                        <small className="text-secondary d-block text-uppercase fw-semibold" style={{ fontSize: '0.65rem' }}>Average</small>
+                        <span className="fs-6 fw-bold text-dark">₹{formatPrice(analysis.avg_price)}</span>
                       </div>
                     </div>
                     <div className="col-4">
-                      <div className="p-3 bg-light rounded-2">
-                        <small className="text-muted d-block text-uppercase fw-semibold" style={{ fontSize: '0.65rem' }}>Highest</small>
+                      <div className="p-2.5 bg-light rounded-2">
+                        <small className="text-secondary d-block text-uppercase fw-semibold" style={{ fontSize: '0.65rem' }}>Highest</small>
                         <span className="fs-6 fw-bold text-danger">₹{formatPrice(analysis.max_price)}</span>
                       </div>
                     </div>
@@ -217,14 +266,14 @@ export default function SearchResult() {
               {/* Price History Table */}
               {product.price_history && product.price_history.length > 0 && (
                 <div className="card border rounded-3 p-4 bg-white" style={{ borderColor: '#e5e7eb' }}>
-                  <h6 className="fw-semibold mb-3 text-dark">Price History</h6>
+                  <h6 className="fw-semibold mb-3 text-dark">Recorded Price Changes</h6>
                   <div className="table-responsive">
                     <table className="table table-hover align-middle text-center mb-0 small">
                       <thead className="table-light">
                         <tr>
                           <th className="py-2 fw-medium text-muted">Date</th>
-                          <th className="py-2 fw-medium text-muted">Price</th>
-                          <th className="py-2 fw-medium text-muted">Change</th>
+                          <th className="py-2 fw-medium text-muted">Recorded Price</th>
+                          <th className="py-2 fw-medium text-muted">Difference</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -266,7 +315,7 @@ export default function SearchResult() {
             <div className="col-lg-5">
               <div className="card border rounded-3 p-4 bg-white sticky-top" style={{ top: '2rem', borderColor: '#e5e7eb' }}>
                 <div className="text-center pb-3 border-bottom">
-                  <small className="text-muted text-uppercase fw-semibold" style={{ fontSize: '0.7rem' }}>Amazon Price</small>
+                  <small className="text-secondary text-uppercase fw-semibold" style={{ fontSize: '0.7rem' }}>Amazon Price</small>
                   <h3 className="fw-bold text-dark mt-1 mb-0">₹{formatPrice(product.current_price)}</h3>
                 </div>
 
@@ -275,20 +324,38 @@ export default function SearchResult() {
                     href={product.amazon_url || product.url} 
                     target="_blank" 
                     rel="noreferrer" 
-                    className="btn btn-warning w-100 rounded-2 py-2 fw-medium mb-3"
+                    className="btn btn-warning w-100 rounded-2 py-2 fw-medium mb-3 text-dark"
                   >
                     View on Amazon
                   </a>
                 </div>
 
                 {/* Price Alert Form */}
-                <div className="p-3 bg-light rounded-3 border" style={{ borderColor: '#f0f0f0' }}>
+                <div className="p-3 bg-light rounded-3 border" style={{ borderColor: '#eef2f6' }}>
                   <h6 className="fw-semibold mb-1 text-dark">Set Price Alert</h6>
-                  <p className="text-muted small mb-3">
-                    Receive an email notification when the price drops to or below your target.
+                  <p className="text-secondary small mb-3">
+                    Get an instant email alert when the price reaches your target.
                   </p>
 
-                  <label className="form-label small fw-medium text-muted">Desired Price (₹)</label>
+                  {/* Recommended Target Suggestion */}
+                  {analysis.suggested_target_price && analysis.potential_savings > 0 && (
+                    <div className="alert alert-light border rounded-2 p-2 mb-3 small d-flex justify-content-between align-items-center">
+                      <div>
+                        <div className="fw-medium text-dark">Suggested: ₹{formatPrice(analysis.suggested_target_price)}</div>
+                        <div className="text-success" style={{ fontSize: '0.7rem' }}>Save ₹{formatPrice(analysis.potential_savings)} ({analysis.potential_savings_percent}%)</div>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={setSuggestedPrice}
+                        className="btn btn-outline-dark btn-sm rounded-2 py-0.5 px-2 small"
+                        style={{ fontSize: '0.75rem' }}
+                      >
+                        Use Target
+                      </button>
+                    </div>
+                  )}
+
+                  <label className="form-label small fw-medium text-secondary">Target Price (₹)</label>
                   <div className="input-group mb-3">
                     <span className="input-group-text bg-white border-end-0 rounded-start-2 text-muted">₹</span>
                     <input 
@@ -311,7 +378,7 @@ export default function SearchResult() {
 
                   <button 
                     onClick={handleTrack} 
-                    className="btn btn-dark w-100 rounded-2 py-2 fw-medium"
+                    className="btn btn-dark w-100 rounded-2 py-2 fw-medium shadow-sm"
                   >
                     Add to Watchlist
                   </button>

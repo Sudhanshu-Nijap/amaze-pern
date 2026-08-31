@@ -228,11 +228,21 @@ export default function Dashboard() {
                           )}
                         </div>
 
-                        <div className="d-flex align-items-center gap-2 mt-1 small">
+                        <div className="d-flex align-items-center gap-2 mt-1 small flex-wrap">
                           <span className="text-secondary">Target: <strong className="text-dark">₹{formatPrice(target_price)}</strong></span>
                           {targetMet && (
                             <span className="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-1 px-1.5 py-0.5" style={{ fontSize: '0.65rem' }}>
                               TARGET MET
+                            </span>
+                          )}
+                          {a.verdict === 'BUY_NOW' && (
+                            <span className="badge bg-success-subtle text-success border border-success-subtle rounded-1 px-1.5 py-0.5" style={{ fontSize: '0.65rem' }}>
+                              BUY NOW
+                            </span>
+                          )}
+                          {a.verdict === 'WAIT_FOR_DROP' && (
+                            <span className="badge bg-warning-subtle text-dark border border-warning-subtle rounded-1 px-1.5 py-0.5" style={{ fontSize: '0.65rem' }}>
+                              WAIT FOR DROP
                             </span>
                           )}
                         </div>

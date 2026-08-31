@@ -9,6 +9,87 @@ const parseNumericPrice = (val) => {
   return isNaN(num) ? 0 : num;
 };
 
+const calculatePredictiveAnalysis = (currentPrice, historyPrices = [], initialPriceVal) => {
+  const current = parseFloat(currentPrice) || 0;
+  const prices = historyPrices.map(p => parseFloat(p)).filter(p => !isNaN(p) && p > 0);
+  const allPrices = [...prices, current].filter(p => p > 0);
+
+  const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : current;
+  const maxPrice = allPrices.length > 0 ? Math.max(...allPrices) : current;
+  const avgPrice = allPrices.length > 0 ? parseFloat((allPrices.reduce((a, b) => a + b, 0) / allPrices.length).toFixed(2)) : current;
+  const initialPrice = initialPriceVal !== undefined ? parseFloat(initialPriceVal) : (prices.length > 0 ? prices[0] : current);
+  
+  const priceChange = parseFloat((current - initialPrice).toFixed(2));
+  const priceChangePercent = initialPrice > 0 ? parseFloat((((current - initialPrice) / initialPrice) * 100).toFixed(2)) : 0;
+
+  let trend = "stable";
+  if (priceChange < -0.01) trend = "decreased";
+  else if (priceChange > 0.01) trend = "increased";
+
+  // Price position spectrum: 0% (all-time low) to 100% (all-time high)
+  const priceSpread = maxPrice - minPrice;
+  let pricePositionPercent = 0;
+  if (priceSpread > 0) {
+    pricePositionPercent = Math.min(100, Math.max(0, Math.round(((current - minPrice) / priceSpread) * 100)));
+  }
+
+  // Deal score calculation (0 to 100)
+  let dealScore = 100 - pricePositionPercent;
+  if (current <= minPrice && minPrice > 0) dealScore = Math.max(dealScore, 95);
+  if (current >= maxPrice && maxPrice > minPrice) dealScore = Math.min(dealScore, 25);
+
+  // Prediction Verdict & Reasoning
+  let verdict = "FAIR_VALUE";
+  let verdictReason = "Current price is around the historical average. Buy if needed now, or set a target alert.";
+  let dropProbability = 45;
+
+  if (dealScore >= 75 || (current > 0 && current <= minPrice * 1.03)) {
+    verdict = "BUY_NOW";
+    verdictReason = `Price is within 3% of the lowest price ever recorded (₹${minPrice}). High confidence good time to buy.`;
+    dropProbability = 15;
+  } else if (dealScore <= 40 || (maxPrice > minPrice && current >= avgPrice * 1.08)) {
+    verdict = "WAIT_FOR_DROP";
+    verdictReason = `Price is currently high (${pricePositionPercent}% of historical range). A price drop towards ₹${minPrice} is likely.`;
+    dropProbability = 80;
+  } else {
+    verdict = "FAIR_VALUE";
+    verdictReason = `Price (₹${current}) is near its historical average (₹${avgPrice}). Moderate buying value.`;
+    dropProbability = 50;
+  }
+
+  // Suggested Target Price & Potential Savings
+  const suggestedTargetPrice = minPrice > 0 ? minPrice : Math.round(current * 0.9);
+  const potentialSavings = Math.max(0, parseFloat((current - minPrice).toFixed(2)));
+  const potentialSavingsPercent = current > 0 ? parseFloat(((potentialSavings / current) * 100).toFixed(1)) : 0;
+
+  // Volatility
+  let volatility = "Low";
+  if (prices.length >= 3) {
+    const variance = (maxPrice - minPrice) / (avgPrice || 1);
+    if (variance > 0.25) volatility = "High";
+    else if (variance > 0.10) volatility = "Moderate";
+  }
+
+  return {
+    min_price: minPrice,
+    max_price: maxPrice,
+    avg_price: avgPrice,
+    initial_price: initialPrice,
+    price_change: priceChange,
+    price_change_percent: priceChangePercent,
+    trend,
+    deal_score: dealScore,
+    verdict,
+    verdict_reason: verdictReason,
+    drop_probability: dropProbability,
+    price_position_percent: pricePositionPercent,
+    suggested_target_price: suggestedTargetPrice,
+    potential_savings: potentialSavings,
+    potential_savings_percent: potentialSavingsPercent,
+    volatility
+  };
+};
+
 // Matches 'amazon_product_view' (POST /search/)
 const searchProduct = async (req, res) => {
   const { url: userInput } = req.body;
@@ -49,44 +130,17 @@ const getResult = async (req, res) => {
         [product.id]
       );
       const priceHistory = priceRes.rows;
-      const prices = priceHistory.map(p => parseFloat(p.price)).filter(p => !isNaN(p) && p > 0);
-      const current = parseFloat(product.current_price) || 0;
-      const allPrices = [...prices, current].filter(p => p > 0);
+      const historyPrices = priceHistory.map(p => parseFloat(p.price));
+      const currentPrice = parseNumericPrice(product.current_price);
 
-      const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : current;
-      const maxPrice = allPrices.length > 0 ? Math.max(...allPrices) : current;
-      const avgPrice = allPrices.length > 0 ? parseFloat((allPrices.reduce((a, b) => a + b, 0) / allPrices.length).toFixed(2)) : current;
-      const initialPrice = prices.length > 0 ? prices[0] : current;
-      const priceChange = parseFloat((current - initialPrice).toFixed(2));
-      const priceChangePercent = initialPrice > 0 ? parseFloat((((current - initialPrice) / initialPrice) * 100).toFixed(2)) : 0;
-
-      let trend = "stable";
-      if (priceChange < -0.01) trend = "decreased";
-      else if (priceChange > 0.01) trend = "increased";
-
-      let dealAdvice = "FAIR_PRICE";
-      if (current > 0 && current <= minPrice) {
-        dealAdvice = "BEST_PRICE";
-      } else if (current > 0 && current < avgPrice) {
-        dealAdvice = "BELOW_AVERAGE";
-      } else if (current > 0 && current > avgPrice) {
-        dealAdvice = "ABOVE_AVERAGE";
-      }
+      const analysis = calculatePredictiveAnalysis(currentPrice, historyPrices);
 
       return res.status(200).json({
         ...product,
+        current_price: currentPrice,
         product_from_db: true,
         price_history: priceHistory || [],
-        price_analysis: {
-          min_price: minPrice,
-          max_price: maxPrice,
-          avg_price: avgPrice,
-          initial_price: initialPrice,
-          price_change: priceChange,
-          price_change_percent: priceChangePercent,
-          trend: trend,
-          deal_advice: dealAdvice
-        }
+        price_analysis: analysis
       });
     } else {
       // Otherwise, scrape them
@@ -319,28 +373,11 @@ const getTrackedProducts = async (req, res) => {
 
     const data = resRows.rows.map(row => {
       const history = historyMap[row.product_id] || [];
-      const currentPrice = parseFloat(row.current_price) || 0;
-      const targetPrice = parseFloat(row.target_price) || 0;
-      
-      const historyPrices = history.map(h => h.price).filter(p => !isNaN(p) && p > 0);
-      const initialPrice = historyPrices.length > 0 ? historyPrices[0] : currentPrice;
-      const previousPrice = historyPrices.length > 1 ? historyPrices[historyPrices.length - 2] : initialPrice;
-      
-      const allPrices = [...historyPrices, currentPrice].filter(p => p > 0);
-      const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : currentPrice;
-      const maxPrice = allPrices.length > 0 ? Math.max(...allPrices) : currentPrice;
-      const avgPrice = allPrices.length > 0 ? parseFloat((allPrices.reduce((a, b) => a + b, 0) / allPrices.length).toFixed(2)) : currentPrice;
+      const currentPrice = parseNumericPrice(row.current_price);
+      const targetPrice = parseNumericPrice(row.target_price);
+      const historyPrices = history.map(h => h.price);
 
-      const priceChange = parseFloat((currentPrice - initialPrice).toFixed(2));
-      const priceChangePercent = initialPrice > 0 ? parseFloat((((currentPrice - initialPrice) / initialPrice) * 100).toFixed(2)) : 0;
-      
-      let trend = "stable";
-      if (priceChange < -0.01) {
-        trend = "decreased";
-      } else if (priceChange > 0.01) {
-        trend = "increased";
-      }
-
+      const predictiveAnalysis = calculatePredictiveAnalysis(currentPrice, historyPrices);
       const targetReached = currentPrice > 0 && targetPrice > 0 && currentPrice <= targetPrice;
 
       return {
@@ -350,17 +387,9 @@ const getTrackedProducts = async (req, res) => {
         target_price: targetPrice,
         added_at: row.added_at,
         price_analysis: {
-          initial_price: initialPrice,
-          previous_price: previousPrice,
-          current_price: currentPrice,
-          price_change: priceChange,
-          price_change_percent: priceChangePercent,
-          trend: trend,
-          min_price: minPrice,
-          max_price: maxPrice,
-          avg_price: avgPrice,
+          ...predictiveAnalysis,
           target_reached: targetReached,
-          savings_amount: priceChange < 0 ? Math.abs(priceChange) : 0
+          savings_amount: predictiveAnalysis.price_change < 0 ? Math.abs(predictiveAnalysis.price_change) : 0
         },
         price_history: history,
         product: {

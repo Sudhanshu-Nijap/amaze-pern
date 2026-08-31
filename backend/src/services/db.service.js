@@ -1,12 +1,15 @@
-const { Pool } = require("pg");
+let rawConnectionString = process.env.DATABASE_URL || "";
+const connectionString = rawConnectionString.trim().replace(/^["']|["']$/g, "");
 
-const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  console.error("CRITICAL: DATABASE_URL environment variable is not defined or is empty!");
+}
 
 const isRemoteDb = connectionString && !connectionString.includes("localhost") && !connectionString.includes("127.0.0.1");
 const useSsl = process.env.DATABASE_SSL === "true" || (process.env.DATABASE_SSL !== "false" && isRemoteDb);
 
 const pool = new Pool({
-  connectionString,
+  connectionString: connectionString || undefined,
   ssl: useSsl ? { rejectUnauthorized: false } : false
 });
 

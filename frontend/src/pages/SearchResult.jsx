@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../services/api';
+import PriceChart from '../components/PriceChart';
 
 export default function SearchResult() {
   const [product, setProduct] = useState(null);
@@ -156,7 +157,19 @@ export default function SearchResult() {
               {/* Price Insights */}
               {analysis && (analysis.min_price || analysis.avg_price) && (
                 <div className="card border rounded-3 p-4 bg-white mb-4" style={{ borderColor: '#e5e7eb' }}>
-                  <h6 className="fw-semibold mb-3 text-dark">Price Summary</h6>
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h6 className="fw-semibold mb-0 text-dark">Price Trend & Summary</h6>
+                    <span className="text-muted small">Historical Trend</span>
+                  </div>
+
+                  {/* Line Graph */}
+                  <div className="mb-4 pt-2">
+                    <PriceChart 
+                      history={product.price_history || []} 
+                      currentPrice={product.current_price} 
+                      targetPrice={targetPrice ? parseFloat(targetPrice) : null}
+                    />
+                  </div>
 
                   {/* Recommendation Message */}
                   {analysis.deal_advice === 'BEST_PRICE' && (

@@ -66,7 +66,6 @@ export default function SearchResult() {
     const price = getNumericPrice(product?.current_price);
     if (price > 0) {
       if (percent === 0.01) {
-        // Any Price Drop: ₹1 below current price
         setTargetPrice(Math.max(1, price - 1).toFixed(2));
       } else {
         const discounted = price - (price * percent) / 100;
@@ -95,7 +94,7 @@ export default function SearchResult() {
         current_price: cleanCurrent
       };
       await api.post('/products/track', payload);
-      alert('✅ Product successfully added to your watchlist!');
+      alert('Product successfully added to your watchlist.');
     } catch (err) {
       alert('Failed to add price watch. Please make sure you are logged in.');
     }
@@ -104,9 +103,8 @@ export default function SearchResult() {
   if (loading) {
     return (
       <div className="container py-5 text-center">
-        <div className="spinner-border text-primary" role="status"></div>
-        <h4 className="fw-bold mt-3">Analyzing Amazon Product & Price Trends...</h4>
-        <p className="text-muted">Fetching live prices and historical data</p>
+        <div className="spinner-border spinner-border-sm text-secondary" role="status"></div>
+        <p className="text-muted small mt-2">Loading product details and price trends...</p>
       </div>
     );
   }
@@ -114,28 +112,28 @@ export default function SearchResult() {
   const analysis = product?.price_analysis || {};
 
   return (
-    <div className="container py-4">
+    <div className="container py-4" style={{ maxWidth: '1100px' }}>
       {error ? (
-        <div className="alert alert-danger text-center rounded-4 shadow-sm p-4 my-4">
-          <h5 className="fw-bold">Unable to Load Product</h5>
-          <p className="mb-0">{error}</p>
+        <div className="alert alert-danger text-center rounded-3 p-4 my-4 border-0">
+          <h6 className="fw-semibold">Unable to Load Product</h6>
+          <p className="small mb-0 text-muted">{error}</p>
         </div>
       ) : product ? (
         <>
           {/* Header */}
-          <div className="mb-4">
-            <h4 className="fw-bold text-dark mb-2" style={{ lineHeight: '1.4' }}>
+          <div className="mb-4 pb-3 border-bottom">
+            <h4 className="fw-semibold text-dark mb-2" style={{ lineHeight: '1.4' }}>
               {product.title}
             </h4>
             <div className="d-flex flex-wrap gap-2 align-items-center">
-              <span className="badge bg-warning text-dark px-3 py-2 rounded-pill fw-bold">
-                ⭐ {product.rating || "No rating"}
+              <span className="badge bg-light text-dark border rounded-1 px-2 py-1 small">
+                {product.rating || "Rating unavailable"}
               </span>
-              <span className={`badge ${product.stock_status === 'In Stock' ? 'bg-success' : 'bg-danger'} px-3 py-2 rounded-pill`}>
-                {product.stock_status || "Check Amazon"}
+              <span className={`badge ${product.stock_status === 'In Stock' ? 'bg-success text-white' : 'bg-secondary text-white'} rounded-1 px-2 py-1 small`}>
+                {product.stock_status || "Availability unknown"}
               </span>
               {product.asin && (
-                <span className="badge bg-light text-muted border px-3 py-2 rounded-pill">
+                <span className="badge bg-light text-muted border rounded-1 px-2 py-1 small">
                   ASIN: {product.asin}
                 </span>
               )}
@@ -143,74 +141,60 @@ export default function SearchResult() {
           </div>
 
           <div className="row g-4">
-            {/* Left Column: Image & Price Analysis */}
+            {/* Left Column: Image & Analysis */}
             <div className="col-lg-7">
-              {/* Product Image Card */}
-              <div className="card border-0 shadow-sm rounded-4 p-4 text-center bg-white mb-4">
+              {/* Product Image */}
+              <div className="card border rounded-3 p-4 text-center bg-white mb-4" style={{ borderColor: '#e5e7eb' }}>
                 <img 
                   src={product.image_url} 
                   alt={product.title} 
                   className="img-fluid mx-auto"
-                  style={{ maxHeight: '320px', objectFit: 'contain' }} 
+                  style={{ maxHeight: '280px', objectFit: 'contain' }} 
                 />
               </div>
 
-              {/* Price Trend & Buying Advice Card */}
+              {/* Price Insights */}
               {analysis && (analysis.min_price || analysis.avg_price) && (
-                <div className="card border-0 shadow-sm rounded-4 p-4 bg-white mb-4">
-                  <h5 className="fw-bold mb-3 d-flex align-items-center">
-                    <span className="me-2">📊</span> Price Analysis & Trend Insights
-                  </h5>
+                <div className="card border rounded-3 p-4 bg-white mb-4" style={{ borderColor: '#e5e7eb' }}>
+                  <h6 className="fw-semibold mb-3 text-dark">Price Summary</h6>
 
-                  {/* Recommendation Banner */}
+                  {/* Recommendation Message */}
                   {analysis.deal_advice === 'BEST_PRICE' && (
-                    <div className="alert alert-success border-0 rounded-3 d-flex align-items-center mb-3">
-                      <span className="fs-3 me-3">🔥</span>
-                      <div>
-                        <strong>All-Time Low Price!</strong>
-                        <div className="small">The product is currently at or near its lowest recorded price. Great time to buy!</div>
-                      </div>
+                    <div className="alert alert-success border-0 rounded-2 p-3 mb-3 small">
+                      <strong>Lowest recorded price:</strong> This product is currently at or near its lowest recorded price.
                     </div>
                   )}
 
                   {analysis.deal_advice === 'BELOW_AVERAGE' && (
-                    <div className="alert alert-info border-0 rounded-3 d-flex align-items-center mb-3">
-                      <span className="fs-3 me-3">👍</span>
-                      <div>
-                        <strong>Good Value Deal</strong>
-                        <div className="small">The current price (₹{formatPrice(product.current_price)}) is below the historical average of ₹{formatPrice(analysis.avg_price)}.</div>
-                      </div>
+                    <div className="alert alert-info border-0 rounded-2 p-3 mb-3 small">
+                      <strong>Below average price:</strong> Current price (₹{formatPrice(product.current_price)}) is below the historical average of ₹{formatPrice(analysis.avg_price)}.
                     </div>
                   )}
 
                   {analysis.deal_advice === 'ABOVE_AVERAGE' && (
-                    <div className="alert alert-warning border-0 rounded-3 d-flex align-items-center mb-3">
-                      <span className="fs-3 me-3">⚠️</span>
-                      <div>
-                        <strong>Price is Higher than Usual</strong>
-                        <div className="small">Current price is above the historical average (₹{formatPrice(analysis.avg_price)}). Set a price watch to get notified when it drops.</div>
-                      </div>
+                    <div className="alert alert-warning border-0 rounded-2 p-3 mb-3 small">
+                      <strong>Above average price:</strong> Current price is higher than the historical average (₹{formatPrice(analysis.avg_price)}). Set a target price alert below.
                     </div>
                   )}
 
                   {/* 3 Metric Cards */}
-                  <div className="row text-center g-3 mt-1">
+                  <div className="row text-center g-2 mt-1">
                     <div className="col-4">
-                      <div className="p-3 bg-light rounded-3">
-                        <small className="text-muted d-block text-uppercase fw-bold" style={{ fontSize: '0.7rem' }}>All-Time Low</small>
-                        <span className="fs-5 fw-bold text-success">₹{formatPrice(analysis.min_price)}</span>
+                      <div className="p-3 bg-light rounded-2">
+                        <small className="text-muted d-block text-uppercase fw-semibold" style={{ fontSize: '0.65rem' }}>Lowest</small>
+                        <span className="fs-6 fw-bold text-success">₹{formatPrice(analysis.min_price)}</span>
                       </div>
                     </div>
                     <div className="col-4">
-                      <div className="p-3 bg-light rounded-3">
-                        <small className="text-muted d-block text-uppercase fw-bold" style={{ fontSize: '0.7rem' }}>Average Price</small>
-                        <span className="fs-5 fw-bold text-secondary">₹{formatPrice(analysis.avg_price)}</span>
+                      <div className="p-3 bg-light rounded-2">
+                        <small className="text-muted d-block text-uppercase fw-semibold" style={{ fontSize: '0.65rem' }}>Average</small>
+                        <span className="fs-6 fw-bold text-secondary">₹{formatPrice(analysis.avg_price)}</span>
                       </div>
                     </div>
                     <div className="col-4">
-                      <div className="p-3 bg-light rounded-3">
-                        <small className="text-muted d-block text-uppercase fw-bold" style={{ fontSize: '0.7rem' }}>All-Time High</small>
-                        <span className="fs-5 fw-bold text-danger">₹{formatPrice(analysis.max_price)}</span>
+                      <div className="p-3 bg-light rounded-2">
+                        <small className="text-muted d-block text-uppercase fw-semibold" style={{ fontSize: '0.65rem' }}>Highest</small>
+                        <span className="fs-6 fw-bold text-danger">₹{formatPrice(analysis.max_price)}</span>
                       </div>
                     </div>
                   </div>
@@ -219,17 +203,15 @@ export default function SearchResult() {
 
               {/* Price History Table */}
               {product.price_history && product.price_history.length > 0 && (
-                <div className="card border-0 shadow-sm rounded-4 p-4 bg-white">
-                  <h5 className="fw-bold mb-3 d-flex align-items-center">
-                    <span className="me-2">📅</span> Price Change History
-                  </h5>
+                <div className="card border rounded-3 p-4 bg-white" style={{ borderColor: '#e5e7eb' }}>
+                  <h6 className="fw-semibold mb-3 text-dark">Price History</h6>
                   <div className="table-responsive">
-                    <table className="table table-hover align-middle text-center mb-0">
+                    <table className="table table-hover align-middle text-center mb-0 small">
                       <thead className="table-light">
                         <tr>
-                          <th className="py-2">Date Recorded</th>
-                          <th className="py-2">Recorded Price</th>
-                          <th className="py-2">Comparison</th>
+                          <th className="py-2 fw-medium text-muted">Date</th>
+                          <th className="py-2 fw-medium text-muted">Price</th>
+                          <th className="py-2 fw-medium text-muted">Change</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -241,19 +223,19 @@ export default function SearchResult() {
                           return (
                             <tr key={entry.id || index}>
                               <td className="text-muted">{new Date(entry.timestamp).toLocaleDateString()}</td>
-                              <td className="fw-bold text-dark">₹{formatPrice(entryPrice)}</td>
+                              <td className="fw-semibold text-dark">₹{formatPrice(entryPrice)}</td>
                               <td>
                                 {diff < -0.01 ? (
-                                  <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-2 py-1">
-                                    ▼ ₹{formatPrice(Math.abs(diff))} cheaper now
+                                  <span className="badge bg-success bg-opacity-10 text-success rounded-1 px-2 py-1">
+                                    -₹{formatPrice(Math.abs(diff))}
                                   </span>
                                 ) : diff > 0.01 ? (
-                                  <span className="badge bg-danger bg-opacity-10 text-danger rounded-pill px-2 py-1">
-                                    ▲ ₹{formatPrice(diff)} higher now
+                                  <span className="badge bg-danger bg-opacity-10 text-danger rounded-1 px-2 py-1">
+                                    +₹{formatPrice(diff)}
                                   </span>
                                 ) : (
-                                  <span className="badge bg-secondary bg-opacity-10 text-secondary rounded-pill px-2 py-1">
-                                    ● Current
+                                  <span className="badge bg-light text-muted border rounded-1 px-2 py-1">
+                                    Current
                                   </span>
                                 )}
                               </td>
@@ -267,12 +249,12 @@ export default function SearchResult() {
               )}
             </div>
 
-            {/* Right Column: Price Watch & Actions */}
+            {/* Right Column: Track & Amazon Link */}
             <div className="col-lg-5">
-              <div className="card border-0 shadow-sm rounded-4 p-4 bg-white sticky-top" style={{ top: '2rem' }}>
+              <div className="card border rounded-3 p-4 bg-white sticky-top" style={{ top: '2rem', borderColor: '#e5e7eb' }}>
                 <div className="text-center pb-3 border-bottom">
-                  <small className="text-muted text-uppercase fw-bold">Live Amazon Price</small>
-                  <h2 className="fw-bold text-success mt-1 mb-0">₹{formatPrice(product.current_price)}</h2>
+                  <small className="text-muted text-uppercase fw-semibold" style={{ fontSize: '0.7rem' }}>Amazon Price</small>
+                  <h3 className="fw-bold text-dark mt-1 mb-0">₹{formatPrice(product.current_price)}</h3>
                 </div>
 
                 <div className="py-3">
@@ -280,45 +262,45 @@ export default function SearchResult() {
                     href={product.amazon_url || product.url} 
                     target="_blank" 
                     rel="noreferrer" 
-                    className="btn btn-warning w-100 rounded-pill py-2 fw-bold mb-3 shadow-sm"
+                    className="btn btn-warning w-100 rounded-2 py-2 fw-medium mb-3"
                   >
-                    View Product on Amazon ↗
+                    View on Amazon
                   </a>
                 </div>
 
                 {/* Price Alert Form */}
-                <div className="p-3 bg-light rounded-4 border">
-                  <h6 className="fw-bold mb-1">Set Price Drop Alert</h6>
+                <div className="p-3 bg-light rounded-3 border" style={{ borderColor: '#f0f0f0' }}>
+                  <h6 className="fw-semibold mb-1 text-dark">Set Price Alert</h6>
                   <p className="text-muted small mb-3">
-                    We will track this product and notify you instantly when the price drops to your target.
+                    Receive an email notification when the price drops to or below your target.
                   </p>
 
-                  <label className="form-label small fw-bold text-muted">Target Price (₹)</label>
+                  <label className="form-label small fw-medium text-muted">Desired Price (₹)</label>
                   <div className="input-group mb-3">
-                    <span className="input-group-text bg-white border-end-0 rounded-start-pill">₹</span>
+                    <span className="input-group-text bg-white border-end-0 rounded-start-2 text-muted">₹</span>
                     <input 
                       type="number" 
-                      className="form-control border-start-0 rounded-end-pill" 
+                      className="form-control border-start-0 rounded-end-2 bg-white" 
                       placeholder="e.g. 75000" 
                       value={targetPrice}
                       onChange={(e) => setTargetPrice(e.target.value)}
                     />
                   </div>
 
-                  {/* Quick Discount Presets */}
-                  <div className="d-flex gap-2 flex-wrap justify-content-center mb-3">
-                    <button type="button" onClick={() => applyDiscount(3)} className="btn btn-outline-secondary btn-sm rounded-pill px-3">-3%</button>
-                    <button type="button" onClick={() => applyDiscount(5)} className="btn btn-outline-secondary btn-sm rounded-pill px-3">-5%</button>
-                    <button type="button" onClick={() => applyDiscount(10)} className="btn btn-outline-secondary btn-sm rounded-pill px-3">-10%</button>
-                    <button type="button" onClick={() => applyDiscount(15)} className="btn btn-outline-secondary btn-sm rounded-pill px-3">-15%</button>
-                    <button type="button" onClick={() => applyDiscount(0.01)} className="btn btn-outline-success btn-sm rounded-pill px-3">Any Drop</button>
+                  {/* Preset Buttons */}
+                  <div className="d-flex gap-1 flex-wrap justify-content-center mb-3">
+                    <button type="button" onClick={() => applyDiscount(3)} className="btn btn-outline-secondary btn-sm rounded-2 px-2 py-1 small">-3%</button>
+                    <button type="button" onClick={() => applyDiscount(5)} className="btn btn-outline-secondary btn-sm rounded-2 px-2 py-1 small">-5%</button>
+                    <button type="button" onClick={() => applyDiscount(10)} className="btn btn-outline-secondary btn-sm rounded-2 px-2 py-1 small">-10%</button>
+                    <button type="button" onClick={() => applyDiscount(15)} className="btn btn-outline-secondary btn-sm rounded-2 px-2 py-1 small">-15%</button>
+                    <button type="button" onClick={() => applyDiscount(0.01)} className="btn btn-outline-secondary btn-sm rounded-2 px-2 py-1 small">Any Drop</button>
                   </div>
 
                   <button 
                     onClick={handleTrack} 
-                    className="btn btn-primary w-100 rounded-pill py-2 fw-bold shadow-sm"
+                    className="btn btn-dark w-100 rounded-2 py-2 fw-medium"
                   >
-                    🔔 Add to Watchlist
+                    Add to Watchlist
                   </button>
                 </div>
               </div>
@@ -326,10 +308,8 @@ export default function SearchResult() {
           </div>
         </>
       ) : (
-        <div className="text-center py-5">
-          <div className="fs-1 mb-3">🔍</div>
-          <h4 className="fw-bold mb-2">Search Amazon Products</h4>
-          <p className="text-muted">Paste an Amazon URL or ASIN above to view price analysis and history.</p>
+        <div className="text-center py-5 border rounded-3 bg-light bg-opacity-25 my-4">
+          <p className="text-muted small mb-0">Paste an Amazon URL or ASIN in the search bar above.</p>
         </div>
       )}
     </div>

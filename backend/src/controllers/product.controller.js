@@ -37,11 +37,44 @@ const getResult = async (req, res) => {
         [product.id]
       );
       const priceHistory = priceRes.rows;
+      const prices = priceHistory.map(p => parseFloat(p.price)).filter(p => !isNaN(p) && p > 0);
+      const current = parseFloat(product.current_price) || 0;
+      const allPrices = [...prices, current].filter(p => p > 0);
+
+      const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : current;
+      const maxPrice = allPrices.length > 0 ? Math.max(...allPrices) : current;
+      const avgPrice = allPrices.length > 0 ? parseFloat((allPrices.reduce((a, b) => a + b, 0) / allPrices.length).toFixed(2)) : current;
+      const initialPrice = prices.length > 0 ? prices[0] : current;
+      const priceChange = parseFloat((current - initialPrice).toFixed(2));
+      const priceChangePercent = initialPrice > 0 ? parseFloat((((current - initialPrice) / initialPrice) * 100).toFixed(2)) : 0;
+
+      let trend = "stable";
+      if (priceChange < -0.01) trend = "decreased";
+      else if (priceChange > 0.01) trend = "increased";
+
+      let dealAdvice = "FAIR_PRICE";
+      if (current > 0 && current <= minPrice) {
+        dealAdvice = "BEST_PRICE";
+      } else if (current > 0 && current < avgPrice) {
+        dealAdvice = "BELOW_AVERAGE";
+      } else if (current > 0 && current > avgPrice) {
+        dealAdvice = "ABOVE_AVERAGE";
+      }
 
       return res.status(200).json({
         ...product,
         product_from_db: true,
-        price_history: priceHistory || []
+        price_history: priceHistory || [],
+        price_analysis: {
+          min_price: minPrice,
+          max_price: maxPrice,
+          avg_price: avgPrice,
+          initial_price: initialPrice,
+          price_change: priceChange,
+          price_change_percent: priceChangePercent,
+          trend: trend,
+          deal_advice: dealAdvice
+        }
       });
     } else {
       // Otherwise, scrape them
@@ -243,28 +276,90 @@ const getTrackedProducts = async (req, res) => {
               p.id as p_id, p.asin, p.title, p.image_url, p.current_price, p.rating, p.stock_status, p.amazon_url, p.last_scraped
        FROM scraper_trackedproduct t
        JOIN scraper_product p ON t.product_id = p.id
-       WHERE t.user_id = $1`,
+       WHERE t.user_id = $1
+       ORDER BY t.added_at DESC`,
       [user.djangoId]
     );
 
-    const data = resRows.rows.map(row => ({
-      id: row.id,
-      user_id: row.user_id,
-      product_id: row.product_id,
-      target_price: row.target_price,
-      added_at: row.added_at,
-      product: {
-        id: row.p_id,
-        asin: row.asin,
-        title: row.title,
-        image_url: row.image_url,
-        current_price: row.current_price,
-        rating: row.rating,
-        stock_status: row.stock_status,
-        amazon_url: row.amazon_url,
-        last_scraped: row.last_scraped
+    const productIds = resRows.rows.map(r => r.product_id);
+    let historyMap = {};
+
+    if (productIds.length > 0) {
+      const historyRes = await query(
+        `SELECT product_id, price, timestamp 
+         FROM scraper_pricehistory 
+         WHERE product_id = ANY($1::int[]) 
+         ORDER BY timestamp ASC`,
+        [productIds]
+      );
+      historyRes.rows.forEach(h => {
+        if (!historyMap[h.product_id]) historyMap[h.product_id] = [];
+        historyMap[h.product_id].push({
+          price: parseFloat(h.price),
+          timestamp: h.timestamp
+        });
+      });
+    }
+
+    const data = resRows.rows.map(row => {
+      const history = historyMap[row.product_id] || [];
+      const currentPrice = parseFloat(row.current_price) || 0;
+      const targetPrice = parseFloat(row.target_price) || 0;
+      
+      const historyPrices = history.map(h => h.price).filter(p => !isNaN(p) && p > 0);
+      const initialPrice = historyPrices.length > 0 ? historyPrices[0] : currentPrice;
+      const previousPrice = historyPrices.length > 1 ? historyPrices[historyPrices.length - 2] : initialPrice;
+      
+      const allPrices = [...historyPrices, currentPrice].filter(p => p > 0);
+      const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : currentPrice;
+      const maxPrice = allPrices.length > 0 ? Math.max(...allPrices) : currentPrice;
+      const avgPrice = allPrices.length > 0 ? parseFloat((allPrices.reduce((a, b) => a + b, 0) / allPrices.length).toFixed(2)) : currentPrice;
+
+      const priceChange = parseFloat((currentPrice - initialPrice).toFixed(2));
+      const priceChangePercent = initialPrice > 0 ? parseFloat((((currentPrice - initialPrice) / initialPrice) * 100).toFixed(2)) : 0;
+      
+      let trend = "stable";
+      if (priceChange < -0.01) {
+        trend = "decreased";
+      } else if (priceChange > 0.01) {
+        trend = "increased";
       }
-    }));
+
+      const targetReached = currentPrice > 0 && targetPrice > 0 && currentPrice <= targetPrice;
+
+      return {
+        id: row.id,
+        user_id: row.user_id,
+        product_id: row.product_id,
+        target_price: targetPrice,
+        added_at: row.added_at,
+        price_analysis: {
+          initial_price: initialPrice,
+          previous_price: previousPrice,
+          current_price: currentPrice,
+          price_change: priceChange,
+          price_change_percent: priceChangePercent,
+          trend: trend,
+          min_price: minPrice,
+          max_price: maxPrice,
+          avg_price: avgPrice,
+          target_reached: targetReached,
+          savings_amount: priceChange < 0 ? Math.abs(priceChange) : 0
+        },
+        price_history: history,
+        product: {
+          id: row.p_id,
+          asin: row.asin,
+          title: row.title,
+          image_url: row.image_url,
+          current_price: currentPrice,
+          rating: row.rating,
+          stock_status: row.stock_status,
+          amazon_url: row.amazon_url,
+          last_scraped: row.last_scraped
+        }
+      };
+    });
 
     res.status(200).json(data);
   } catch (error) {

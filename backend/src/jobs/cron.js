@@ -11,7 +11,7 @@ const checkPrices = async () => {
     const trackedItemsRes = await query(`
       SELECT t.target_price,
              p.id as p_id, p.title, p.current_price, p.amazon_url,
-             u.email
+             u.id as u_id, u.email
       FROM scraper_trackedproduct t
       JOIN scraper_product p ON t.product_id = p.id
       JOIN scraper_customuser u ON t.user_id = u.id
@@ -26,6 +26,7 @@ const checkPrices = async () => {
         amazon_url: row.amazon_url
       },
       scraper_customuser: {
+        id: row.u_id,
         email: row.email
       }
     }));
@@ -56,6 +57,13 @@ const checkPrices = async () => {
             new Date(),
             product.id
           ]
+        );
+
+        // Record in price history
+        await query(
+          `INSERT INTO scraper_pricehistory (user_id, product_id, price, timestamp)
+           VALUES ($1, $2, $3, $4)`,
+          [user.id, product.id, newPrice, new Date()]
         );
 
         // Check for price drop

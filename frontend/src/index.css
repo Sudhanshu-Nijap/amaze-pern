@@ -166,3 +166,42 @@ body {
     -ms-overflow-style: none;
     scrollbar-width: none;
 }
+
+/* Modern Dashboard Styles */
+.dashboard-card {
+    border: 1px solid #e2e8f0;
+    background-color: #ffffff;
+    border-radius: 12px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dashboard-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+    border-color: #cbd5e1;
+}
+
+.badge-drop {
+    background-color: #ecfdf5;
+    color: #047857;
+    border: 1px solid #a7f3d0;
+}
+
+.badge-increase {
+    background-color: #fff1f2;
+    color: #be123c;
+    border: 1px solid #fecdd3;
+}
+
+.badge-neutral {
+    background-color: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+}
+
+.product-img-wrapper {
+    background-color: #fafbfc;
+    border: 1px solid #edf2f7;
+    border-radius: 8px;
+    padding: 6px;
+}

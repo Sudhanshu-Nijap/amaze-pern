@@ -13,7 +13,8 @@ const formatPrice = (val) => {
 
 export default function Dashboard() {
   const [trackedProducts, setTrackedProducts] = useState([]);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState('all'); // 'all', 'decreased', 'increased', 'target', 'buynow'
+  const [sortBy, setSortBy] = useState('default'); // 'default', 'discount', 'price_asc', 'price_desc'
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
@@ -55,10 +56,12 @@ export default function Dashboard() {
     }
   };
 
+  // Summary counts
   const stats = useMemo(() => {
     let drops = 0;
     let increases = 0;
     let targetMet = 0;
+    let buyNowCount = 0;
     let totalSavings = 0;
 
     trackedProducts.forEach(item => {
@@ -70,13 +73,15 @@ export default function Dashboard() {
         increases++;
       }
       if (a.target_reached) targetMet++;
+      if (a.verdict === 'BUY_NOW') buyNowCount++;
     });
 
-    return { total: trackedProducts.length, drops, increases, targetMet, totalSavings };
+    return { total: trackedProducts.length, drops, increases, targetMet, buyNowCount, totalSavings };
   }, [trackedProducts]);
 
+  // Filtered & Sorted List
   const filteredProducts = useMemo(() => {
-    return trackedProducts.filter(item => {
+    let result = trackedProducts.filter(item => {
       const a = item.price_analysis || {};
       const matchesSearch = item.product?.title?.toLowerCase().includes(searchQuery.toLowerCase());
       if (!matchesSearch) return false;
@@ -84,25 +89,46 @@ export default function Dashboard() {
       if (filter === 'decreased') return a.trend === 'decreased';
       if (filter === 'increased') return a.trend === 'increased';
       if (filter === 'target') return a.target_reached;
+      if (filter === 'buynow') return a.verdict === 'BUY_NOW';
       return true;
     });
-  }, [trackedProducts, filter, searchQuery]);
+
+    if (sortBy === 'discount') {
+      result.sort((a, b) => (b.price_analysis?.price_change_percent || 0) - (a.price_analysis?.price_change_percent || 0));
+    } else if (sortBy === 'price_asc') {
+      result.sort((a, b) => (parseFloat(a.product?.current_price) || 0) - (parseFloat(b.product?.current_price) || 0));
+    } else if (sortBy === 'price_desc') {
+      result.sort((a, b) => (parseFloat(b.product?.current_price) || 0) - (parseFloat(a.product?.current_price) || 0));
+    }
+
+    return result;
+  }, [trackedProducts, filter, searchQuery, sortBy]);
 
   return (
-    <div className="container py-4" style={{ maxWidth: '1120px' }}>
+    <div className="container py-4" style={{ maxWidth: '1140px' }}>
       {/* Top Header */}
       <div className="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
         <div>
-          <h4 className="fw-bold mb-1 text-dark" style={{ letterSpacing: '-0.02em' }}>Watchlist</h4>
-          <p className="text-secondary small mb-0">Overview of monitored products and price movements</p>
+          <div className="text-secondary small fw-medium text-uppercase mb-1" style={{ fontSize: '0.7rem', letterSpacing: '0.06em' }}>
+            Overview &rsaquo; Price Monitoring
+          </div>
+          <h3 className="fw-bold mb-1 text-dark" style={{ letterSpacing: '-0.02em' }}>
+            Watchlist
+          </h3>
+          <p className="text-secondary small mb-0">
+            Real-time price monitoring, predictive insights, and drop alerts for your saved products.
+          </p>
         </div>
-        <Link to="/search" className="btn btn-dark btn-sm px-3 py-2 rounded-2 fw-medium shadow-sm">
-          + Track New Product
-        </Link>
+
+        <div className="d-flex gap-2 align-items-center">
+          <Link to="/search" className="btn btn-dark btn-sm px-3 py-2 rounded-2 fw-medium shadow-sm">
+            + Track New Product
+          </Link>
+        </div>
       </div>
 
       {/* KPI Stats Strip */}
-      <div className="card border-0 rounded-3 bg-white mb-4 shadow-sm" style={{ border: '1px solid #eef2f6' }}>
+      <div className="card border-0 rounded-3 bg-white mb-4 shadow-sm" style={{ border: '1px solid #e2e8f0' }}>
         <div className="row g-0 text-center py-2">
           <div className="col-6 col-md-3 py-2 border-end border-light-subtle">
             <small className="text-secondary d-block text-uppercase fw-semibold" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>
@@ -127,16 +153,17 @@ export default function Dashboard() {
 
           <div className="col-6 col-md-3 py-2">
             <small className="text-secondary d-block text-uppercase fw-semibold" style={{ fontSize: '0.65rem', letterSpacing: '0.05em' }}>
-              Target Reached
+              Target Met
             </small>
             <span className="fs-4 fw-bold text-warning-emphasis">{stats.targetMet}</span>
           </div>
         </div>
       </div>
 
-      {/* Filter Tabs & Search Bar */}
+      {/* Filter Tabs, Search & Sort Bar */}
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-        <div className="d-flex gap-2 flex-wrap">
+        {/* Segmented Filter Pills */}
+        <div className="d-flex gap-1 flex-wrap">
           <button
             type="button"
             className={`btn btn-sm rounded-2 px-3 fw-medium ${filter === 'all' ? 'btn-dark text-white' : 'btn-light text-secondary border'}`}
@@ -168,16 +195,39 @@ export default function Dashboard() {
           >
             Target Met <span className="opacity-75 ms-1">({stats.targetMet})</span>
           </button>
+
+          {stats.buyNowCount > 0 && (
+            <button
+              type="button"
+              className={`btn btn-sm rounded-2 px-3 fw-medium ${filter === 'buynow' ? 'btn-primary text-white' : 'btn-light text-secondary border'}`}
+              onClick={() => setFilter('buynow')}
+            >
+              Buy Now Deals <span className="opacity-75 ms-1">({stats.buyNowCount})</span>
+            </button>
+          )}
         </div>
 
-        <div style={{ minWidth: '220px', maxWidth: '300px' }} className="flex-grow-1 flex-md-grow-0">
+        {/* Search & Sort Controls */}
+        <div className="d-flex gap-2 flex-grow-1 flex-md-grow-0" style={{ minWidth: '280px' }}>
           <input
             type="text"
-            className="form-control form-control-sm rounded-2 bg-white border px-3"
-            placeholder="Filter watchlist..."
+            className="form-control form-control-sm rounded-2 bg-white border px-3 flex-grow-1"
+            placeholder="Search products..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+
+          <select
+            className="form-select form-select-sm rounded-2 bg-white border"
+            style={{ width: '130px' }}
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+          >
+            <option value="default">Default</option>
+            <option value="discount">Top Discount</option>
+            <option value="price_asc">Price: Low to High</option>
+            <option value="price_desc">Price: High to Low</option>
+          </select>
         </div>
       </div>
 
@@ -194,54 +244,73 @@ export default function Dashboard() {
             const isDrop = a.trend === 'decreased';
             const isIncrease = a.trend === 'increased';
             const targetMet = a.target_reached;
+            const currentPriceNum = parseFloat(product.current_price) || 0;
+            const targetPriceNum = parseFloat(target_price) || 0;
+
+            // Target progress percentage
+            let targetProgress = 100;
+            if (targetPriceNum > 0 && currentPriceNum > targetPriceNum) {
+              const initial = parseFloat(a.initial_price) || currentPriceNum;
+              if (initial > targetPriceNum) {
+                targetProgress = Math.max(0, Math.min(100, Math.round(((initial - currentPriceNum) / (initial - targetPriceNum)) * 100)));
+              } else {
+                targetProgress = Math.round((targetPriceNum / currentPriceNum) * 100);
+              }
+            }
 
             return (
               <div className="col" key={product.asin}>
-                <div 
-                  className="card h-100 border rounded-3 p-3 bg-white d-flex flex-column justify-content-between shadow-sm transition-all"
-                  style={{ borderColor: '#e2e8f0', transition: 'border-color 0.2s, box-shadow 0.2s' }}
-                >
+                <div className="dashboard-card h-100 p-3 d-flex flex-column justify-content-between">
                   <div>
-                    {/* Top Row: Thumbnail + Price Block */}
+                    {/* Top Row: Thumbnail + Price & Badges */}
                     <div className="d-flex align-items-start gap-3 mb-3">
                       <Link to={`/result?url=${encodeURIComponent(product.amazon_url)}`} className="flex-shrink-0">
-                        <img
-                          src={product.image_url}
-                          alt={product.title}
-                          className="rounded-2 border p-1"
-                          style={{ width: '68px', height: '68px', objectFit: 'contain', background: '#fafbfc', borderColor: '#edf2f7' }}
-                        />
+                        <div className="product-img-wrapper">
+                          <img
+                            src={product.image_url}
+                            alt={product.title}
+                            style={{ width: '64px', height: '64px', objectFit: 'contain' }}
+                          />
+                        </div>
                       </Link>
 
                       <div className="flex-grow-1 min-w-0">
-                        <div className="d-flex align-items-baseline gap-2 flex-wrap">
+                        {/* Current Price */}
+                        <div className="d-flex align-items-baseline gap-2 flex-wrap mb-1">
                           <span className="fs-5 fw-bold text-dark">₹{formatPrice(product.current_price)}</span>
+                          
                           {isDrop && (
-                            <span className="badge bg-success-subtle text-success border border-success-subtle rounded-1 px-2 py-0.5 small fw-semibold">
+                            <span className="badge badge-drop rounded-1 px-2 py-0.5 small fw-semibold">
                               -{formatPrice(Math.abs(a.price_change))} ({Math.abs(a.price_change_percent)}%)
                             </span>
                           )}
                           {isIncrease && (
-                            <span className="badge bg-danger-subtle text-danger border border-danger-subtle rounded-1 px-2 py-0.5 small fw-semibold">
+                            <span className="badge badge-increase rounded-1 px-2 py-0.5 small fw-semibold">
                               +{formatPrice(a.price_change)} (+{a.price_change_percent}%)
                             </span>
                           )}
                         </div>
 
-                        <div className="d-flex align-items-center gap-2 mt-1 small flex-wrap">
-                          <span className="text-secondary">Target: <strong className="text-dark">₹{formatPrice(target_price)}</strong></span>
+                        {/* Target & Predictive Status Tags */}
+                        <div className="d-flex align-items-center gap-1.5 flex-wrap small">
+                          <span className="text-secondary" style={{ fontSize: '0.75rem' }}>
+                            Target: <strong className="text-dark">₹{formatPrice(target_price)}</strong>
+                          </span>
+
                           {targetMet && (
-                            <span className="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-1 px-1.5 py-0.5" style={{ fontSize: '0.65rem' }}>
+                            <span className="badge bg-warning text-dark border border-warning rounded-1 px-1.5 py-0.5" style={{ fontSize: '0.65rem' }}>
                               TARGET MET
                             </span>
                           )}
+
                           {a.verdict === 'BUY_NOW' && (
-                            <span className="badge bg-success-subtle text-success border border-success-subtle rounded-1 px-1.5 py-0.5" style={{ fontSize: '0.65rem' }}>
+                            <span className="badge bg-success text-white rounded-1 px-1.5 py-0.5" style={{ fontSize: '0.65rem' }}>
                               BUY NOW
                             </span>
                           )}
+
                           {a.verdict === 'WAIT_FOR_DROP' && (
-                            <span className="badge bg-warning-subtle text-dark border border-warning-subtle rounded-1 px-1.5 py-0.5" style={{ fontSize: '0.65rem' }}>
+                            <span className="badge bg-light text-muted border rounded-1 px-1.5 py-0.5" style={{ fontSize: '0.65rem' }}>
                               WAIT FOR DROP
                             </span>
                           )}
@@ -254,7 +323,7 @@ export default function Dashboard() {
                       to={`/result?url=${encodeURIComponent(product.amazon_url)}`}
                       className="text-decoration-none text-dark d-block mb-3"
                     >
-                      <h6 className="card-title title-clamp small mb-0 text-dark" style={{ lineHeight: '1.45', height: '2.9em', fontWeight: '500' }}>
+                      <h6 className="card-title title-clamp small mb-0 text-dark" style={{ lineHeight: '1.45', height: '2.9em', fontWeight: '600' }}>
                         {product.title}
                       </h6>
                     </Link>
@@ -273,10 +342,10 @@ export default function Dashboard() {
                   <div className="d-flex justify-content-between align-items-center pt-2 border-top border-light-subtle">
                     <Link
                       to={`/result?url=${encodeURIComponent(product.amazon_url)}`}
-                      className="btn btn-outline-dark btn-sm rounded-2 px-2.5 py-1"
+                      className="btn btn-outline-dark btn-sm rounded-2 px-2.5 py-1 fw-medium"
                       style={{ fontSize: '0.75rem' }}
                     >
-                      Price Details
+                      Price Details &rarr;
                     </Link>
 
                     <div className="d-flex align-items-center gap-2">
@@ -308,7 +377,7 @@ export default function Dashboard() {
         <div className="text-center py-5 border rounded-3 bg-white my-4 shadow-sm" style={{ borderColor: '#e2e8f0' }}>
           <h6 className="fw-semibold text-dark mb-1">No products found</h6>
           <p className="text-secondary small mb-3">
-            {filter !== 'all' ? `No products match the "${filter}" filter criteria.` : "You have not added any products to your watchlist yet."}
+            {filter !== 'all' ? `No products match the selected filter.` : "You have not added any products to your watchlist yet."}
           </p>
           <Link to="/search" className="btn btn-dark btn-sm px-3 rounded-2">
             Track a Product

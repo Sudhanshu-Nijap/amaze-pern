@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../services/api';
 import PriceChart from '../components/PriceChart';
+import io from 'socket.io-client';
+
+const socket = io(import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000');
 
 export default function SearchResult() {
   const [product, setProduct] = useState(null);
@@ -42,10 +45,14 @@ export default function SearchResult() {
     setError('');
     try {
       const res = await api.post('/products/search', { url });
-      setProduct(res.data);
+      if (res.data.jobId) {
+        listenForJobStatus(res.data.jobId);
+      } else {
+        setProduct(res.data);
+        setLoading(false);
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to fetch product details.');
-    } finally {
       setLoading(false);
     }
   };
@@ -55,12 +62,32 @@ export default function SearchResult() {
     setError('');
     try {
       const res = await api.get(`/products/result?url=${encodeURIComponent(url)}`);
-      setProduct(res.data);
+      if (res.data.jobId) {
+        listenForJobStatus(res.data.jobId);
+      } else {
+        setProduct(res.data);
+        setLoading(false);
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to fetch product details.');
-    } finally {
       setLoading(false);
     }
+  };
+
+  const listenForJobStatus = (targetJobId) => {
+    const handleJobCompleted = (payload) => {
+      if (String(payload.jobId) === String(targetJobId)) {
+        if (payload.status === 'completed') {
+          setProduct(payload.data);
+        } else if (payload.status === 'failed') {
+          setError(payload.error || 'Scraping job failed.');
+        }
+        setLoading(false);
+        socket.off('job_completed', handleJobCompleted);
+      }
+    };
+    socket.on('job_completed', handleJobCompleted);
+    return () => socket.off('job_completed', handleJobCompleted);
   };
 
   const applyDiscount = (percent) => {

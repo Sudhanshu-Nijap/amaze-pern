@@ -90,6 +90,9 @@ const calculatePredictiveAnalysis = (currentPrice, historyPrices = [], initialPr
   };
 };
 
+const { scrapeQueue } = require('../services/queue.service');
+const qdrantService = require('../services/qdrant.service');
+
 // Matches 'amazon_product_view' (POST /search/)
 const searchProduct = async (req, res) => {
   const { url: userInput } = req.body;
@@ -100,18 +103,19 @@ const searchProduct = async (req, res) => {
     const asinPattern = /^[A-Z0-9]{10}$/;
     const url = asinPattern.test(userInput) ? `https://www.amazon.in/dp/${userInput}` : userInput;
 
-    const productData = await scraperService.scrapeProduct(url);
-    if (productData && productData.error) return res.status(400).json(productData);
-
-    if (productData && productData.current_price) {
-      productData.current_price = parseNumericPrice(productData.current_price);
-    }
-
-    res.status(200).json(productData);
+    const job = await scrapeQueue.add('scrape-amazon', { url });
+    
+    res.status(202).json({ 
+      jobId: job.id,
+      status: "queued",
+      message: "Scraping job queued"
+    });
   } catch (error) {
-    res.status(500).json({ error: "Scraping failed: " + error.message });
+    res.status(500).json({ error: "Failed to queue job: " + error.message });
   }
 };
+
+const aiService = require("../services/ai.service");
 
 // Matches 'result' (GET /result/)
 const getResult = async (req, res) => {
@@ -140,24 +144,25 @@ const getResult = async (req, res) => {
         current_price: currentPrice,
         product_from_db: true,
         price_history: priceHistory || [],
-        price_analysis: analysis
+        price_analysis: analysis,
+        sentiment: {
+          score: product.sentiment_score,
+          verdict: product.sentiment_verdict
+        }
       });
     } else {
-      // Otherwise, scrape them
+      // Otherwise, queue a scrape job
       try {
-        const productData = await scraperService.scrapeProduct(url);
-        if (productData && productData.error) return res.status(400).json({ error: productData.error });
+        const job = await scrapeQueue.add('scrape-amazon', { url });
 
-        if (productData && productData.current_price) {
-          productData.current_price = parseNumericPrice(productData.current_price);
-        }
-
-        return res.status(200).json({
-          ...productData,
+        return res.status(202).json({
+          jobId: job.id,
+          status: "queued",
+          message: "Scraping job queued",
           product_from_db: false
         });
-      } catch (scrapeError) {
-        return res.status(500).json({ error: "Scraping failed: " + scrapeError.message });
+      } catch (queueError) {
+        return res.status(500).json({ error: "Failed to queue job: " + queueError.message });
       }
     }
   } catch (error) {
@@ -165,13 +170,24 @@ const getResult = async (req, res) => {
   }
 };
 
+const Redis = require('ioredis');
+const redisClient = new Redis(process.env.REDIS_URL || {
+  host: process.env.REDIS_HOST || 'redis',
+  port: process.env.REDIS_PORT || 6379
+});
+
 // Matches 'bestsellers_view'
 const getBestsellers = async (req, res) => {
   const start = parseInt(req.query.start) || 0;
   const count = 20;
 
   try {
-    // Check if products exist in DB
+    const cacheKey = `bestsellers:${start}:${count}`;
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json(JSON.parse(cachedData));
+    }
+
     const countRes = await query("SELECT COUNT(*) FROM scraper_bestseller");
     const productCount = parseInt(countRes.rows[0].count, 10);
 
@@ -179,8 +195,6 @@ const getBestsellers = async (req, res) => {
       console.log("Database empty. Scraping new products...");
       try {
         const scrapedProducts = await scraperService.getBestsellers(0, 20);
-        
-        // Save scraped data efficiently
         if (scrapedProducts && scrapedProducts.length > 0) {
           for (const p of scrapedProducts) {
             await query(
@@ -202,6 +216,8 @@ const getBestsellers = async (req, res) => {
       [count, start]
     );
 
+    // Cache for 6 hours (21600 seconds)
+    await redisClient.setex(cacheKey, 21600, JSON.stringify(dataRes.rows));
     res.status(200).json(dataRes.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -214,6 +230,12 @@ const getTodayDeals = async (req, res) => {
   const count = 20;
 
   try {
+    const cacheKey = `todaydeals:${start}:${count}`;
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json(JSON.parse(cachedData));
+    }
+
     const countRes = await query("SELECT COUNT(*) FROM scraper_todaydeals");
     const productCount = parseInt(countRes.rows[0].count, 10);
 
@@ -221,7 +243,6 @@ const getTodayDeals = async (req, res) => {
       console.log("Database empty. Scraping new Today's Deals...");
       try {
         const scrapedProducts = await scraperService.getTodayDeals(0, 20);
-        
         if (scrapedProducts && scrapedProducts.length > 0) {
           for (const p of scrapedProducts) {
             await query(
@@ -243,6 +264,8 @@ const getTodayDeals = async (req, res) => {
       [count, start]
     );
 
+    // Cache for 6 hours
+    await redisClient.setex(cacheKey, 21600, JSON.stringify(dataRes.rows));
     res.status(200).json(dataRes.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -251,7 +274,7 @@ const getTodayDeals = async (req, res) => {
 
 // Matches 'track_products_db'
 const trackProduct = async (req, res) => {
-  const { asin, title, image_url, amazon_url, current_price, rating, stock_status, desired_price } = req.body;
+  const { asin, title, image_url, amazon_url, current_price, rating, stock_status, desired_price, sentiment_score, sentiment_verdict } = req.body;
   const user = req.user;
 
   if (!user) return res.status(401).json({ error: "User not authenticated." });
@@ -264,9 +287,13 @@ const trackProduct = async (req, res) => {
     const cleanPrice = parseFloat(String(current_price).replace(/[^0-9.]/g, '')) || 0;
 
     if (!product) {
+      // Generate embedding for RAG
+      const embeddingArray = await aiService.generateEmbedding(title);
+      const embeddingStr = embeddingArray ? `[${embeddingArray.join(',')}]` : null;
+
       const insertRes = await query(
-        `INSERT INTO scraper_product (asin, title, image_url, current_price, rating, stock_status, amazon_url, last_scraped)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO scraper_product (asin, title, image_url, current_price, rating, stock_status, amazon_url, embedding, last_scraped, sentiment_score, sentiment_verdict)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`,
         [
           asin,
@@ -276,7 +303,10 @@ const trackProduct = async (req, res) => {
           rating || "0 out of 5 stars",
           stock_status,
           amazon_url,
-          new Date()
+          embeddingStr,
+          new Date(),
+          sentiment_score || null,
+          sentiment_verdict || null
         ]
       );
       product = insertRes.rows[0];
@@ -328,7 +358,31 @@ const trackProduct = async (req, res) => {
       ]
     );
 
-    res.status(200).json({ success: true });
+    // 4. Update Document Chunks for RAG
+    const priceRes = await query("SELECT price, timestamp as recorded_at FROM scraper_pricehistory WHERE product_id = $1 ORDER BY timestamp ASC", [product.id]);
+    const priceRows = priceRes.rows;
+
+    // Create Document Chunks for RAG (Details, Price History, Sentiment)
+    const priceHistoryForRAG = priceRows.map(row => ({ price: row.price, timestamp: row.recorded_at }));
+    const productChunks = aiService.generateProductChunks(product, priceHistoryForRAG);
+
+    // Generate embeddings and push to Qdrant
+    if (productChunks && productChunks.length > 0) {
+      const embeddings = [];
+      for (const chunk of productChunks) {
+        const chunkEmbeddingArray = await aiService.generateEmbedding(chunk.content);
+        embeddings.push(chunkEmbeddingArray);
+      }
+      
+      // Upsert to Qdrant
+      try {
+        await qdrantService.upsertChunks(product.id, product.title, productChunks, embeddings);
+      } catch (qErr) {
+        console.error("Failed to push to Qdrant:", qErr);
+      }
+    }
+
+    res.status(200).json({ message: "Product tracked successfully", product });
   } catch (error) {
     console.error("Track Product Error:", error);
     res.status(500).json({ error: error.message });
@@ -343,7 +397,7 @@ const getTrackedProducts = async (req, res) => {
   try {
     const resRows = await query(
       `SELECT t.*, 
-              p.id as p_id, p.asin, p.title, p.image_url, p.current_price, p.rating, p.stock_status, p.amazon_url, p.last_scraped
+              p.id as p_id, p.asin, p.title, p.image_url, p.current_price, p.rating, p.stock_status, p.amazon_url, p.last_scraped, p.sentiment_score, p.sentiment_verdict
        FROM scraper_trackedproduct t
        JOIN scraper_product p ON t.product_id = p.id
        WHERE t.user_id = $1
@@ -402,6 +456,10 @@ const getTrackedProducts = async (req, res) => {
           stock_status: row.stock_status,
           amazon_url: row.amazon_url,
           last_scraped: row.last_scraped
+        },
+        sentiment: {
+          score: row.sentiment_score,
+          verdict: row.sentiment_verdict
         }
       };
     });
@@ -434,9 +492,39 @@ const untrackProduct = async (req, res) => {
   }
 };
 
+const getJobStatus = async (req, res) => {
+  const { jobId } = req.params;
+  try {
+    const job = await scrapeQueue.getJob(jobId);
+    
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const state = await job.getState();
+    const progress = job.progress;
+    const reason = job.failedReason;
+    const returnvalue = job.returnvalue;
+
+    if (state === 'completed' && returnvalue) {
+      if (returnvalue.current_price) {
+        returnvalue.current_price = parseNumericPrice(returnvalue.current_price);
+      }
+      return res.status(200).json({ status: state, data: returnvalue });
+    } else if (state === 'failed') {
+      return res.status(400).json({ status: state, error: reason || "Job failed" });
+    } else {
+      return res.status(200).json({ status: state, progress });
+    }
+  } catch (error) {
+    res.status(500).json({ error: "Failed to check job status: " + error.message });
+  }
+};
+
 module.exports = {
   searchProduct,
   getResult,
+  getJobStatus,
   getBestsellers,
   getTodayDeals,
   trackProduct,

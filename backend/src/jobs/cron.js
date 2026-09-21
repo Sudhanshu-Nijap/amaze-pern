@@ -116,9 +116,9 @@ const scrapeDailyData = async () => {
 };
 
 // Runs every day at 8:00 AM
-// cron.schedule("0 8 * * *", scrapeDailyData);
+cron.schedule("0 8 * * *", scrapeDailyData);
 
 // Runs every 4 hours to check tracked products prices
-// cron.schedule("0 */4 * * *", checkPrices);
+cron.schedule("0 */4 * * *", checkPrices);
 
 module.exports = { cron, checkPrices, scrapeDailyData };

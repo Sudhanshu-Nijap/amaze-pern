@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Bestsellers from './pages/Bestsellers';
 import Deals from './pages/Deals';
 import SearchResult from './pages/SearchResult';
+import ChatbotWidget from './components/ChatbotWidget';
 
 function App() {
   return (

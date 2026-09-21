@@ -92,16 +92,23 @@ def amazon_scraper(url):
 
         # Extract additional product details
         product_info = {}
-        product_info_table = soup.find("table", {"id": "productDetails_techSpec_section_1"})
-        if product_info_table:
-            rows = product_info_table.find_all("tr")
+        # Try multiple tables
+        info_tables = soup.find_all("table", class_=re.compile("a-keyvalue|prodDetTable"))
+        if not info_tables:
+            info_table = soup.find("table", {"id": "productDetails_techSpec_section_1"})
+            if info_table:
+                info_tables = [info_table]
+
+        for table in info_tables:
+            rows = table.find_all("tr")
             for row in rows:
                 th = row.find("th")
                 td = row.find("td")
                 if th and td:
-                    key = th.get_text(strip=True)
-                    value = td.get_text(strip=True)
-                    product_info[key] = re.sub(r'\u200e', '', value)
+                    key = th.get_text(strip=True).replace('\u200e', '')
+                    value = td.get_text(strip=True).replace('\u200e', '')
+                    if key and value:
+                        product_info[key] = value
 
         # Alternative extraction if first method fails
         if not product_info:
@@ -118,11 +125,26 @@ def amazon_scraper(url):
         out_of_stock = soup.find(string=re.compile(r"Currently unavailable|Out of stock", re.IGNORECASE))
         add_to_cart = soup.find("input", {"id": "add-to-cart-button"})
         buy_now = soup.find("input", {"id": "buy-now-button"})
-
         stock_status = not bool(out_of_stock) if (add_to_cart or buy_now) else True
 
         # Convert to affiliate link
         product_url = add_affiliate_tag(normalize_url(url))
+
+        # Extract top reviews
+        reviews = []
+        # Look for multiple possible review containers
+        review_elements = soup.find_all("div", {"data-hook": "review"})
+        if not review_elements:
+            review_elements = soup.find_all("div", {"data-hook": "review-collapsed"})
+        if not review_elements:
+            review_elements = soup.find_all("span", {"data-hook": "review-body"})
+        
+        for rev in review_elements[:10]:
+            # Try to get just the text part of the review, avoiding the title/author
+            body = rev.find("span", {"data-hook": "review-body"}) or rev
+            text = body.get_text(separator=' ', strip=True)
+            if text:
+                reviews.append(text)
 
         return {
             "asin": asin,
@@ -132,7 +154,8 @@ def amazon_scraper(url):
             "image_url": image_url,
             "product_info": product_info,
             "stock_status": stock_status,
-            "url": product_url
+            "url": product_url,
+            "reviews": reviews
         }
 
     except Exception as e:

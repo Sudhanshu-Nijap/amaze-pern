@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { io } from 'socket.io-client';
+import PriceChart from '../components/PriceChart';
+import ChatbotWidget from '../components/ChatbotWidget';
 
 const formatPrice = (val) => {
   if (val === undefined || val === null) return "0";
@@ -17,6 +19,7 @@ export default function Dashboard() {
   const [sortBy, setSortBy] = useState('default'); // 'default', 'discount', 'price_asc', 'price_desc'
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [expandedCharts, setExpandedCharts] = useState({});
   const { user } = useAuth();
 
   const fetchTracked = async () => {
@@ -54,6 +57,10 @@ export default function Dashboard() {
     } catch (err) {
       alert("Failed to remove price watch");
     }
+  };
+
+  const toggleChart = (asin) => {
+    setExpandedCharts(prev => ({ ...prev, [asin]: !prev[asin] }));
   };
 
   // Summary counts
@@ -239,7 +246,7 @@ export default function Dashboard() {
         </div>
       ) : filteredProducts.length > 0 ? (
         <div className="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
-          {filteredProducts.map(({ product, target_price, price_analysis }) => {
+          {filteredProducts.map(({ product, target_price, price_analysis, price_history, sentiment }) => {
             const a = price_analysis || {};
             const isDrop = a.trend === 'decreased';
             const isIncrease = a.trend === 'increased';
@@ -260,7 +267,7 @@ export default function Dashboard() {
 
             return (
               <div className="col" key={product.asin}>
-                <div className="dashboard-card h-100 p-3 d-flex flex-column justify-content-between">
+                <div className="dashboard-card h-100 p-3 d-flex flex-column justify-content-between bg-white border rounded-3 shadow-sm">
                   <div>
                     {/* Top Row: Thumbnail + Price & Badges */}
                     <div className="d-flex align-items-start gap-3 mb-3">
@@ -280,12 +287,12 @@ export default function Dashboard() {
                           <span className="fs-5 fw-bold text-dark">₹{formatPrice(product.current_price)}</span>
                           
                           {isDrop && (
-                            <span className="badge badge-drop rounded-1 px-2 py-0.5 small fw-semibold">
+                            <span className="badge bg-success bg-opacity-10 text-success rounded-1 px-2 py-0.5 small fw-semibold">
                               -{formatPrice(Math.abs(a.price_change))} ({Math.abs(a.price_change_percent)}%)
                             </span>
                           )}
                           {isIncrease && (
-                            <span className="badge badge-increase rounded-1 px-2 py-0.5 small fw-semibold">
+                            <span className="badge bg-danger bg-opacity-10 text-danger rounded-1 px-2 py-0.5 small fw-semibold">
                               +{formatPrice(a.price_change)} (+{a.price_change_percent}%)
                             </span>
                           )}
@@ -314,6 +321,12 @@ export default function Dashboard() {
                               WAIT FOR DROP
                             </span>
                           )}
+
+                          {sentiment?.score && (
+                            <span className={`badge ${sentiment.score >= 75 ? 'bg-success' : sentiment.score >= 50 ? 'bg-primary' : 'bg-danger'} text-white rounded-1 px-1.5 py-0.5`} style={{ fontSize: '0.65rem' }}>
+                              AI Sentiment: {sentiment.score}%
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -338,15 +351,30 @@ export default function Dashboard() {
                     </div>
                   </div>
 
+                  {/* Expandable Chart Area */}
+                  {expandedCharts[product.asin] && (
+                    <div className="mb-3 p-2 bg-light rounded-2 border">
+                      <div className="d-flex justify-content-between align-items-center mb-1">
+                        <span className="fw-semibold small text-dark" style={{ fontSize: '0.75rem' }}>History</span>
+                        <span className="text-muted small" style={{ fontSize: '0.7rem' }}>Volatility: {a.volatility || 'Low'}</span>
+                      </div>
+                      <PriceChart 
+                        history={price_history || []} 
+                        currentPrice={product.current_price} 
+                        targetPrice={target_price ? parseFloat(target_price) : null}
+                      />
+                    </div>
+                  )}
+
                   {/* Actions Footer */}
-                  <div className="d-flex justify-content-between align-items-center pt-2 border-top border-light-subtle">
-                    <Link
-                      to={`/result?url=${encodeURIComponent(product.amazon_url)}`}
-                      className="btn btn-outline-dark btn-sm rounded-2 px-2.5 py-1 fw-medium"
+                  <div className="d-flex justify-content-between align-items-center pt-2 border-top border-light-subtle mt-auto">
+                    <button
+                      onClick={() => toggleChart(product.asin)}
+                      className="btn btn-outline-secondary btn-sm rounded-2 px-2.5 py-1 fw-medium"
                       style={{ fontSize: '0.75rem' }}
                     >
-                      Price Details &rarr;
-                    </Link>
+                      {expandedCharts[product.asin] ? 'Hide Chart' : 'Show Chart'}
+                    </button>
 
                     <div className="d-flex align-items-center gap-2">
                       <a
@@ -379,11 +407,10 @@ export default function Dashboard() {
           <p className="text-secondary small mb-3">
             {filter !== 'all' ? `No products match the selected filter.` : "You have not added any products to your watchlist yet."}
           </p>
-          <Link to="/search" className="btn btn-dark btn-sm px-3 rounded-2">
-            Track a Product
-          </Link>
         </div>
       )}
+      <ChatbotWidget />
     </div>
   );
 }
+

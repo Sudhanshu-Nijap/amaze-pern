@@ -12,4 +12,17 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Token is invalid or expired, clear local storage and force a reload
+      localStorage.removeItem('supabase_token');
+      localStorage.removeItem('supabase_session');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;

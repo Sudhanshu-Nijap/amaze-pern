@@ -1,7 +1,7 @@
 const { execFile } = require("child_process");
 const path = require("path");
 
-const PYTHON_EXECUTABLE = process.env.PYTHON_EXECUTABLE || "python";
+const PYTHON_EXECUTABLE = process.env.PYTHON_EXECUTABLE || "python3";
 const SCRAPER_DIR = path.join(__dirname, "../../python_scraper");
 
 function runPythonScript(scriptName, args = []) {

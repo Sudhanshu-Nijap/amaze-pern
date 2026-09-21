@@ -21,6 +21,8 @@ const initDb = async () => {
   console.log("Initializing database tables...");
   
   const createTablesQuery = `
+    CREATE EXTENSION IF NOT EXISTS vector;
+
     CREATE TABLE IF NOT EXISTS scraper_customuser (
       id SERIAL PRIMARY KEY,
       email VARCHAR(255) UNIQUE NOT NULL,
@@ -42,6 +44,9 @@ const initDb = async () => {
       rating VARCHAR(100),
       stock_status VARCHAR(100),
       amazon_url TEXT,
+      sentiment_score NUMERIC(5, 2),
+      sentiment_verdict VARCHAR(100),
+      embedding vector(384),
       last_scraped TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -78,6 +83,14 @@ const initDb = async () => {
       image_url TEXT,
       product_url TEXT UNIQUE NOT NULL,
       scraped_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS scraper_document_chunks (
+      id SERIAL PRIMARY KEY,
+      product_id INTEGER REFERENCES scraper_product(id) ON DELETE CASCADE,
+      chunk_type VARCHAR(50),
+      content TEXT NOT NULL,
+      embedding vector(384)
     );
   `;
 

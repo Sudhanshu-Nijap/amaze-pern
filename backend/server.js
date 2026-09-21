@@ -8,6 +8,7 @@ const server = http.createServer(app);
 socket.init(server);
 
 require("./src/jobs/cron"); // Start cron jobs
+require("./src/services/queue.service"); // Start BullMQ worker
 
 const PORT = process.env.PORT || 5000;
 

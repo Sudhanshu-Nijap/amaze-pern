@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: amaze_db
     restart: always
     environment:
@@ -10,9 +10,23 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: amaze
     ports:
-      - "5432:5432"
+      - "6543:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:alpine
+    container_name: amaze_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: amaze_qdrant
+    restart: always
+    ports:
+      - "6333:6333"
 
   backend:
     build:

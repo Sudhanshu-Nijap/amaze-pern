@@ -113,26 +113,7 @@ export default function Dashboard() {
 
   return (
     <div className="container py-4" style={{ maxWidth: '1140px' }}>
-      {/* Top Header */}
-      <div className="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
-        <div>
-          <div className="text-secondary small fw-medium text-uppercase mb-1" style={{ fontSize: '0.7rem', letterSpacing: '0.06em' }}>
-            Overview &rsaquo; Price Monitoring
-          </div>
-          <h3 className="fw-bold mb-1 text-dark" style={{ letterSpacing: '-0.02em' }}>
-            Watchlist
-          </h3>
-          <p className="text-secondary small mb-0">
-            Real-time price monitoring, predictive insights, and drop alerts for your saved products.
-          </p>
-        </div>
-
-        <div className="d-flex gap-2 align-items-center">
-          <Link to="/search" className="btn btn-dark btn-sm px-3 py-2 rounded-2 fw-medium shadow-sm">
-            + Track New Product
-          </Link>
-        </div>
-      </div>
+      {/* Top Header removed per user request */}
 
       {/* KPI Stats Strip */}
       <div className="card border-0 rounded-3 bg-white mb-4 shadow-sm" style={{ border: '1px solid #e2e8f0' }}>

@@ -8,6 +8,9 @@ import Dashboard from './pages/Dashboard';
 import Bestsellers from './pages/Bestsellers';
 import Deals from './pages/Deals';
 import SearchResult from './pages/SearchResult';
+import Wishlists from './pages/Wishlists';
+import HotDeals from './pages/HotDeals';
+import GlobalSearchResults from './pages/GlobalSearchResults';
 import ChatbotWidget from './components/ChatbotWidget';
 
 function App() {
@@ -19,12 +22,15 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/search" element={<SearchResult />} />
+            <Route path="/search-db" element={<GlobalSearchResults />} />
             <Route path="/result" element={<SearchResult />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/bestsellers" element={<Bestsellers />} />
             <Route path="/deals" element={<Deals />} />
+            <Route path="/wishlists" element={<Wishlists />} />
+            <Route path="/hot-deals" element={<HotDeals />} />
           </Routes>
         </div>
       </Router>

@@ -6,11 +6,19 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [url, setUrl] = useState('');
+  const [query, setQuery] = useState('');
 
   const handleSearch = (e) => {
     e.preventDefault();
-    navigate(`/search?url=${encodeURIComponent(url)}`);
+    const isUrl = query.startsWith('http://') || query.startsWith('https://') || query.includes('amazon.in') || query.includes('amzn.to');
+    
+    if (isUrl || query.length === 10 && query.toUpperCase() === query) {
+      // It's a URL or an ASIN (usually 10 uppercase alphanumeric chars)
+      navigate(`/search?url=${encodeURIComponent(query)}`);
+    } else {
+      // It's a generic keyword search
+      navigate(`/search-db?q=${encodeURIComponent(query)}`);
+    }
   };
 
   return (
@@ -24,9 +32,9 @@ export default function Navbar() {
             <input 
               className="form-control search-bar rounded-pill shadow-sm px-3 me-3" 
               type="text" 
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="Enter Amazon URL or ASIN" 
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Enter Amazon URL, ASIN, or search for products..." 
               required 
               aria-label="Search" 
             />

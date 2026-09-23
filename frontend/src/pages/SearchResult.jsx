@@ -27,6 +27,26 @@ export default function SearchResult() {
     return num.toLocaleString('en-IN', { maximumFractionDigits: 2 });
   };
 
+  const renderStars = (ratingString) => {
+    if (!ratingString || typeof ratingString !== 'string') return null;
+    const match = ratingString.match(/([\d.]+)\s*out of 5/i);
+    if (!match) return <span className="small text-muted">{ratingString}</span>;
+    
+    const rating = parseFloat(match[1]);
+    if (isNaN(rating)) return <span className="small text-muted">{ratingString}</span>;
+    
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+    
+    return (
+      <div className="d-flex justify-content-center align-items-center gap-1 mb-2" title={ratingString}>
+        <span className="fw-bold text-dark" style={{ fontSize: '1.2rem' }}>{rating}</span>
+        <span className="text-muted" style={{ fontSize: '0.9rem' }}>out of 5</span>
+      </div>
+    );
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const url = params.get('url');
@@ -125,7 +145,9 @@ export default function SearchResult() {
         rating: product.rating,
         stock_status: product.stock_status,
         desired_price: cleanTarget,
-        current_price: cleanCurrent
+        current_price: cleanCurrent,
+        product_info: product.product_info,
+        reviews: product.reviews
       };
       await api.post('/products/track', payload);
       alert('Product successfully added to your watchlist.');
@@ -161,10 +183,7 @@ export default function SearchResult() {
             <h4 className="fw-semibold text-dark mb-2" style={{ lineHeight: '1.4' }}>
               {product.title}
             </h4>
-            <div className="d-flex flex-wrap gap-2 align-items-center">
-              <span className="badge bg-light text-dark border rounded-1 px-2 py-1 small">
-                {product.rating || "Rating unavailable"}
-              </span>
+            <div className="d-flex flex-wrap gap-3 align-items-center">
               <span className={`badge ${product.stock_status === 'In Stock' ? 'bg-success text-white' : 'bg-secondary text-white'} rounded-1 px-2 py-1 small`}>
                 {product.stock_status || "Availability unknown"}
               </span>
@@ -336,12 +355,36 @@ export default function SearchResult() {
                   </div>
                 </div>
               )}
+
+              {/* Product Information Table */}
+              {product.product_info && Object.keys(product.product_info).length > 0 && (
+                <div className="card border rounded-3 p-4 bg-white mb-4" style={{ borderColor: '#e5e7eb' }}>
+                  <h6 className="fw-semibold mb-3 text-dark">Product Details</h6>
+                  <div className="table-responsive">
+                    <table className="table table-bordered table-striped align-middle small mb-0">
+                      <tbody>
+                        {Object.entries(product.product_info).map(([key, value], idx) => (
+                          <tr key={idx}>
+                            <th className="text-muted fw-medium bg-light" style={{ width: '35%' }}>{key}</th>
+                            <td className="text-dark">{value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+
             </div>
 
             {/* Right Column: Track & Amazon Link */}
             <div className="col-lg-5">
               <div className="card border rounded-3 p-4 bg-white sticky-top" style={{ top: '2rem', borderColor: '#e5e7eb' }}>
                 <div className="text-center pb-3 border-bottom">
+                  {product.rating && product.rating !== "0 out of 5 stars" && product.rating !== "Rating unavailable" && (
+                    renderStars(product.rating)
+                  )}
                   <small className="text-secondary text-uppercase fw-semibold" style={{ fontSize: '0.7rem' }}>Amazon Price</small>
                   <h3 className="fw-bold text-dark mt-1 mb-0">₹{formatPrice(product.current_price)}</h3>
                 </div>
@@ -356,6 +399,27 @@ export default function SearchResult() {
                     View on Amazon
                   </a>
                 </div>
+
+                {/* Sentiment Analysis Card */}
+                {product.sentiment && (
+                  <div className="p-3 bg-light rounded-3 border mb-3" style={{ borderColor: '#eef2f6' }}>
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <h6 className="fw-semibold mb-0 text-dark">Customer Sentiment</h6>
+                      {product.sentiment.score ? (
+                        <span className={`badge ${product.sentiment.score >= 75 ? 'bg-success' : product.sentiment.score >= 50 ? 'bg-primary' : 'bg-danger'} text-white rounded-1 px-2 py-1 small`}>
+                          {product.sentiment.score}% Positive
+                        </span>
+                      ) : (
+                        <span className="badge bg-secondary text-white rounded-1 px-2 py-1 small">
+                          No Reviews
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-secondary small mb-0">
+                      <strong>AI Verdict:</strong> {product.sentiment.verdict || "Insufficient data for sentiment analysis."}
+                    </p>
+                  </div>
+                )}
 
                 {/* Price Alert Form */}
                 <div className="p-3 bg-light rounded-3 border" style={{ borderColor: '#eef2f6' }}>

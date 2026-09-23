@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amaze Tracker</title>
+    <link rel="icon" type="image/png" href="icon128.png">
+    <link rel="stylesheet" href="popup.css">
+    <link href="https://fonts.googleapis.com/css2?family=Courgette&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="logo">amaze<span class="dot">.</span></h1>
+            <p class="subtitle">Smart Amazon Price Tracker</p>
+        </div>
+        
+        <div id="content-container">
+            <div class="input-group">
+                <input type="text" id="urlInput" class="input-field" placeholder="Paste Amazon URL here...">
+                <button id="trackBtn" class="btn btn-primary">Track Product</button>
+            </div>
+            <p id="message" class="message" style="display: none;"></p>
+        </div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

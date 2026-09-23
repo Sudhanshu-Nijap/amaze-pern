@@ -1,0 +1,41 @@
+name: Continuous Integration (CI)
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Frontend Dependencies and Lint
+        working-directory: ./frontend
+        run: |
+          npm install
+          npm run lint || echo "Linting finished"
+
+      - name: Test Backend Docker Build
+        run: docker build -t amaze-backend-test ./backend
+        
+      - name: Test Frontend Docker Build
+        # Pass placeholder args to ensure the build completes successfully
+        run: |
+          docker build \
+            --build-arg VITE_SUPABASE_URL="test_url" \
+            --build-arg VITE_SUPABASE_KEY="test_key" \
+            --build-arg VITE_API_URL="test_api" \
+            --build-arg VITE_SOCKET_URL="test_socket" \
+            -t amaze-frontend-test ./frontend

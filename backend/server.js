@@ -3,6 +3,7 @@ const app = require("./src/app");
 const http = require("http");
 const socket = require("./src/socket");
 const { initDb } = require("./src/services/db.service");
+const { startConsumers, connectProducer } = require("./src/services/kafka.service");
 
 const server = http.createServer(app);
 socket.init(server);
@@ -15,6 +16,11 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   try {
     await initDb();
+
+    // Initialize Kafka
+    await connectProducer();
+    await startConsumers();
+
     server.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
     });

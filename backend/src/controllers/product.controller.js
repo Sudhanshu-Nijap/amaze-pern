@@ -272,9 +272,29 @@ const getTodayDeals = async (req, res) => {
   }
 };
 
+const getHotDeals = async (req, res) => {
+  try {
+    const dataRes = await query(`
+      SELECT p.*,
+             (MAX(h.price) - p.current_price) / NULLIF(MAX(h.price), 0) * 100 AS drop_percentage,
+             MAX(h.price) AS max_historical_price
+      FROM scraper_product p
+      JOIN scraper_pricehistory h ON p.id = h.product_id
+      WHERE p.current_price > 0
+      GROUP BY p.id
+      HAVING MAX(h.price) > p.current_price
+      ORDER BY drop_percentage DESC
+      LIMIT 20;
+    `);
+    res.status(200).json(dataRes.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // Matches 'track_products_db'
 const trackProduct = async (req, res) => {
-  const { asin, title, image_url, amazon_url, current_price, rating, stock_status, desired_price, sentiment_score, sentiment_verdict } = req.body;
+  const { asin, title, image_url, amazon_url, current_price, rating, stock_status, desired_price, sentiment_score, sentiment_verdict, product_info, reviews } = req.body;
   const user = req.user;
 
   if (!user) return res.status(401).json({ error: "User not authenticated." });
@@ -292,8 +312,8 @@ const trackProduct = async (req, res) => {
       const embeddingStr = embeddingArray ? `[${embeddingArray.join(',')}]` : null;
 
       const insertRes = await query(
-        `INSERT INTO scraper_product (asin, title, image_url, current_price, rating, stock_status, amazon_url, embedding, last_scraped, sentiment_score, sentiment_verdict)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        `INSERT INTO scraper_product (asin, title, image_url, current_price, rating, stock_status, amazon_url, embedding, last_scraped, sentiment_score, sentiment_verdict, product_info, reviews)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          RETURNING *`,
         [
           asin,
@@ -306,19 +326,24 @@ const trackProduct = async (req, res) => {
           embeddingStr,
           new Date(),
           sentiment_score || null,
-          sentiment_verdict || null
+          sentiment_verdict || null,
+          product_info ? JSON.stringify(product_info) : null,
+          reviews ? JSON.stringify(reviews) : null
         ]
       );
       product = insertRes.rows[0];
     } else {
-      // Update current price if changed
-      if (parseFloat(product.current_price) !== cleanPrice) {
-        const updateRes = await query(
-          "UPDATE scraper_product SET current_price = $1 WHERE id = $2 RETURNING *",
-          [cleanPrice, product.id]
-        );
-        product = updateRes.rows[0];
-      }
+      // Update current price and new fields if changed
+      const updateRes = await query(
+        "UPDATE scraper_product SET current_price = $1, product_info = COALESCE($2, product_info), reviews = COALESCE($3, reviews) WHERE id = $4 RETURNING *",
+        [
+          cleanPrice, 
+          product_info ? JSON.stringify(product_info) : null,
+          reviews ? JSON.stringify(reviews) : null,
+          product.id
+        ]
+      );
+      product = updateRes.rows[0];
     }
 
     // 2. Add product to TrackedProduct
@@ -362,25 +387,23 @@ const trackProduct = async (req, res) => {
     const priceRes = await query("SELECT price, timestamp as recorded_at FROM scraper_pricehistory WHERE product_id = $1 ORDER BY timestamp ASC", [product.id]);
     const priceRows = priceRes.rows;
 
-    // Create Document Chunks for RAG (Details, Price History, Sentiment)
-    const priceHistoryForRAG = priceRows.map(row => ({ price: row.price, timestamp: row.recorded_at }));
-    const productChunks = aiService.generateProductChunks(product, priceHistoryForRAG);
-
-    // Generate embeddings and push to Qdrant
-    if (productChunks && productChunks.length > 0) {
-      const embeddings = [];
-      for (const chunk of productChunks) {
-        const chunkEmbeddingArray = await aiService.generateEmbedding(chunk.content);
-        embeddings.push(chunkEmbeddingArray);
-      }
-      
-      // Upsert to Qdrant
+    // Run heavy embedding generation in the background so it doesn't block the UI
+    (async () => {
       try {
-        await qdrantService.upsertChunks(product.id, product.title, productChunks, embeddings);
-      } catch (qErr) {
-        console.error("Failed to push to Qdrant:", qErr);
+        const priceHistoryForRAG = priceRows.map(row => ({ price: row.price, timestamp: row.recorded_at }));
+        const productChunks = aiService.generateProductChunks(product, priceHistoryForRAG);
+
+        if (productChunks && productChunks.length > 0) {
+          const embeddings = await Promise.all(
+            productChunks.map(chunk => aiService.generateEmbedding(chunk.content))
+          );
+          
+          await qdrantService.upsertChunks(product.id, product.title, productChunks, embeddings);
+        }
+      } catch (err) {
+        console.error("Failed to push to Qdrant in background:", err);
       }
-    }
+    })();
 
     res.status(200).json({ message: "Product tracked successfully", product });
   } catch (error) {
@@ -521,13 +544,32 @@ const getJobStatus = async (req, res) => {
   }
 };
 
+const searchDbProducts = async (req, res) => {
+  try {
+    const q = req.query.q || '';
+    if (!q) {
+      return res.status(400).json({ error: "Search query is required" });
+    }
+    const results = await query(
+      "SELECT * FROM scraper_product WHERE title ILIKE $1",
+      [`%${q}%`]
+    );
+    res.status(200).json(results.rows);
+  } catch (error) {
+    console.error("Search DB Error:", error);
+    res.status(500).json({ error: "Failed to search products in DB" });
+  }
+};
+
 module.exports = {
   searchProduct,
   getResult,
   getJobStatus,
   getBestsellers,
   getTodayDeals,
+  getHotDeals,
   trackProduct,
   getTrackedProducts,
-  untrackProduct
+  untrackProduct,
+  searchDbProducts
 };

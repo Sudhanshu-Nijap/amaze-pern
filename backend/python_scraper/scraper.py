@@ -42,16 +42,19 @@ def amazon_scraper(url):
         }
 
         try:
-            # Try ScraperAPI first
-            response = requests.get(scraperapi_url, headers=headers, timeout=20)
-            if response.status_code == 401:
-                # Fallback to direct request
-                response = requests.get(url, headers=headers, timeout=20)
-            response.raise_for_status()
+            # Try direct request first for speed
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code != 200 or "api-services-support@amazon.com" in response.text:
+                raise Exception("Blocked by Amazon")
         except:
-            # Final attempt direct
-            response = requests.get(url, headers=headers, timeout=20)
-            response.raise_for_status()
+            # Fallback to ScraperAPI if direct request fails or is blocked
+            try:
+                response = requests.get(scraperapi_url, headers=headers, timeout=20)
+                response.raise_for_status()
+            except:
+                # Final attempt direct
+                response = requests.get(url, headers=headers, timeout=20)
+                response.raise_for_status()
 
         html_source = html.unescape(response.text)
         soup = BeautifulSoup(html_source, "html.parser")

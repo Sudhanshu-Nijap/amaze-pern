@@ -94,6 +94,17 @@ async function analyzeReviews(reviews) {
     else if (averagePositivity <= 40) verdict = "Avoid";
     else if (averagePositivity <= 25) verdict = "Terrible Product";
 
+    // Fake Review / Bot Spam heuristic
+    // If all reviews are overwhelmingly positive (>95) and very short, flag as Bot Spam
+    let isFake = false;
+    if (reviews.length >= 3 && averagePositivity > 90) {
+      const avgLength = reviews.reduce((acc, r) => acc + r.length, 0) / reviews.length;
+      if (avgLength < 50) {
+        verdict = "Suspicious (Possible Bot Spam)";
+        isFake = true;
+      }
+    }
+
     return {
       score: averagePositivity.toFixed(2),
       verdict: verdict
@@ -109,10 +120,11 @@ async function analyzeReviews(reviews) {
  */
 async function chatWithGroq(userMessage, productContext) {
   try {
-    const systemPrompt = `You are a helpful AI shopping assistant for Amaze, a price-tracking app. 
-You answer the user's questions based on the context provided about the products they are tracking.
-Keep your answers extremely concise and simple (1-2 sentences maximum). Do not use excessive emojis.
-If no context information is provided or no products are loaded, just reply simply: "I don't have any product context right now. Please tell me which products you are tracking." without any fluff.
+    const systemPrompt = `You are an AI Gift Concierge and shopping assistant for Amaze, a smart price-tracking app. 
+You help users find the perfect gifts and products based on the context provided about the items they are tracking.
+If a user asks for a recommendation (e.g., "Find me a gift for a 12-year-old"), use the context to suggest the best matching products.
+Keep your answers helpful, concise, and engaging (2-3 sentences maximum).
+If no context information is provided or no products match, reply simply: "I don't have any matching products in your tracker right now. Please tell me which products you are tracking."
 
 Context Information:
 ${productContext}
@@ -123,7 +135,7 @@ ${productContext}
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage }
       ],
-      model: "qwen/qwen3.8-27b", // Fast open source model
+      model: "gemma-7b-it", // Updated to a currently supported Groq model
       temperature: 0.5,
       max_tokens: 500,
     });

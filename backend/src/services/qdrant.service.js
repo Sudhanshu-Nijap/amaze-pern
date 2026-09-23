@@ -74,13 +74,13 @@ async function searchChunks(queryVector, userId, limit = 5) {
     // or store user_id in the Qdrant payload during upsert. 
     // For now, let's just search globally.
     
-    const searchResult = await client.search(COLLECTION_NAME, {
-      vector: queryVector,
+    const searchResult = await client.query(COLLECTION_NAME, {
+      query: queryVector,
       limit: limit,
       with_payload: true
     });
 
-    return searchResult.map(result => ({
+    return searchResult.points.map(result => ({
       content: result.payload.content,
       chunk_type: result.payload.chunk_type,
       title: result.payload.title,

@@ -46,6 +46,8 @@ const initDb = async () => {
       amazon_url TEXT,
       sentiment_score NUMERIC(5, 2),
       sentiment_verdict VARCHAR(100),
+      product_info JSONB,
+      reviews JSONB,
       embedding vector(384),
       last_scraped TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
@@ -91,6 +93,22 @@ const initDb = async () => {
       chunk_type VARCHAR(50),
       content TEXT NOT NULL,
       embedding vector(384)
+    );
+
+    CREATE TABLE IF NOT EXISTS scraper_wishlist (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES scraper_customuser(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      is_public BOOLEAN DEFAULT FALSE,
+      share_token VARCHAR(255) UNIQUE
+    );
+
+    CREATE TABLE IF NOT EXISTS scraper_wishlist_item (
+      id SERIAL PRIMARY KEY,
+      wishlist_id INTEGER REFERENCES scraper_wishlist(id) ON DELETE CASCADE,
+      product_id INTEGER REFERENCES scraper_product(id) ON DELETE CASCADE,
+      added_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT unique_wishlist_product UNIQUE (wishlist_id, product_id)
     );
   `;
 

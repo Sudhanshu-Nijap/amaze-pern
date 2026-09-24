@@ -4,10 +4,17 @@ const aiService = require('./ai.service');
 const { query } = require('./db.service');
 const emailService = require('./email.service');
 
-const connection = {
-  host: process.env.REDIS_HOST || 'redis',
-  port: process.env.REDIS_PORT || 6379,
-};
+const IORedis = require('ioredis');
+
+// Support REDIS_URL (used by Upstash) or fallback to host/port
+// BullMQ requires maxRetriesPerRequest: null for its Redis connections
+const connection = process.env.REDIS_URL 
+  ? new IORedis(process.env.REDIS_URL, { maxRetriesPerRequest: null })
+  : new IORedis({ 
+      host: process.env.REDIS_HOST || 'redis', 
+      port: process.env.REDIS_PORT || 6379,
+      maxRetriesPerRequest: null
+    });
 
 const scrapeQueue = new Queue('scrape-jobs', { connection });
 

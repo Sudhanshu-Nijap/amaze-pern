@@ -68,9 +68,9 @@ const cronScrapeWorker = new Worker('cron-scrape-jobs', async (job) => {
   const rawPrice = String(productData.current_price).replace(/[^0-9.]/g, '');
   const newPrice = parseFloat(rawPrice) || old_current_price;
 
-  // Publish event to Kafka instead of doing direct DB/Email writes
-  const kafkaService = require('./kafka.service');
-  await kafkaService.publish('product-updates', {
+  // Publish event to Redis Pub/Sub instead of doing direct DB/Email writes
+  const pubsubService = require('./pubsub.service');
+  await pubsubService.publish('product-updates', {
     event_type: 'PRICE_UPDATED',
     product_id,
     new_price,

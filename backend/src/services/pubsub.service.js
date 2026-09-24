@@ -1,40 +1,44 @@
-const { Kafka } = require('kafkajs');
+const Redis = require('ioredis');
 const { query } = require('./db.service');
 const emailService = require('./email.service');
 const socket = require('../socket');
 
-const kafka = new Kafka({
-  clientId: 'amaze-backend',
-  brokers: [process.env.KAFKA_BROKER || 'localhost:9092'],
-});
+// Use REDIS_URL if provided, else construct from REDIS_HOST/REDIS_PORT
+const redisConfig = process.env.REDIS_URL 
+  ? process.env.REDIS_URL 
+  : { host: process.env.REDIS_HOST || 'redis', port: process.env.REDIS_PORT || 6379 };
 
-const producer = kafka.producer();
+const pub = new Redis(redisConfig);
+const sub = new Redis(redisConfig);
 
 const publish = async (topic, message) => {
   try {
-    await producer.send({
-      topic,
-      messages: [{ value: JSON.stringify(message) }],
-    });
-    console.log(`[Kafka Producer] Message sent to topic ${topic}`);
+    await pub.publish(topic, JSON.stringify(message));
+    console.log(`[Redis Pub/Sub] Message sent to topic ${topic}`);
   } catch (error) {
-    console.error(`[Kafka Producer] Error sending message:`, error);
+    console.error(`[Redis Pub/Sub] Error sending message:`, error);
   }
 };
 
 const startConsumers = async () => {
-  // Consumer for Database Updates
-  const dbConsumer = kafka.consumer({ groupId: 'db-group' });
-  await dbConsumer.connect();
-  await dbConsumer.subscribe({ topic: 'product-updates', fromBeginning: false });
+  // Subscribe to the topic
+  await sub.subscribe('product-updates', (err, count) => {
+    if (err) {
+      console.error('[Redis Pub/Sub] Failed to subscribe: %s', err.message);
+    } else {
+      console.log(`[Redis Pub/Sub] Subscribed successfully! Currently listening to ${count} channels.`);
+    }
+  });
 
-  await dbConsumer.run({
-    eachMessage: async ({ message }) => {
+  // Listen for messages
+  sub.on('message', async (channel, messageStr) => {
+    if (channel === 'product-updates') {
       try {
-        const payload = JSON.parse(message.value.toString());
+        const payload = JSON.parse(messageStr);
         if (payload.event_type === 'PRICE_UPDATED') {
-          console.log(`[Kafka db-consumer] Updating DB for ${payload.product_id}`);
-          // Update product table
+          console.log(`[Redis Pub/Sub] Received PRICE_UPDATED for ${payload.product_id}`);
+          
+          // 1. Database Update Logic
           await query(
             `UPDATE scraper_product 
              SET current_price = $1, stock_status = $2, last_scraped = $3
@@ -42,7 +46,6 @@ const startConsumers = async () => {
             [payload.new_price, payload.stock_status, new Date(), payload.product_id]
           );
           
-          // Insert price history
           await query(
             `INSERT INTO scraper_pricehistory (user_id, product_id, price, timestamp)
              VALUES ($1, $2, $3, $4)`,
@@ -51,24 +54,8 @@ const startConsumers = async () => {
           
           const io = socket.getIO();
           if (io) io.emit("dataUpdated", { type: "prices" });
-        }
-      } catch (err) {
-        console.error('[Kafka db-consumer] Error:', err);
-      }
-    },
-  });
 
-  // Consumer for Email Notifications
-  const notificationConsumer = kafka.consumer({ groupId: 'notification-group' });
-  await notificationConsumer.connect();
-  await notificationConsumer.subscribe({ topic: 'product-updates', fromBeginning: false });
-
-  await notificationConsumer.run({
-    eachMessage: async ({ message }) => {
-      try {
-        const payload = JSON.parse(message.value.toString());
-        if (payload.event_type === 'PRICE_UPDATED') {
-          console.log(`[Kafka notification-consumer] Checking alerts for ${payload.product_id}`);
+          // 2. Notification Logic
           const { new_price, target_price, old_stock_status, stock_status, title, email, amazon_url } = payload;
           
           if (new_price <= target_price) {
@@ -86,23 +73,20 @@ const startConsumers = async () => {
           }
         }
       } catch (err) {
-        console.error('[Kafka notification-consumer] Error:', err);
+         console.error('[Redis Pub/Sub] Error processing message:', err);
       }
-    },
+    }
   });
 
-
-
-  console.log('[Kafka] Consumers started successfully.');
+  console.log('[Redis Pub/Sub] Consumers started successfully.');
 };
 
 const connectProducer = async () => {
-  await producer.connect();
-  console.log('[Kafka] Producer connected successfully.');
+  // Redis pub/sub connects automatically, keeping the interface same as Kafka's
+  console.log('[Redis Pub/Sub] Producer ready.');
 };
 
 module.exports = {
-  kafka,
   publish,
   startConsumers,
   connectProducer

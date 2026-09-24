@@ -3,7 +3,7 @@ const app = require("./src/app");
 const http = require("http");
 const socket = require("./src/socket");
 const { initDb } = require("./src/services/db.service");
-const { startConsumers, connectProducer } = require("./src/services/kafka.service");
+const { startConsumers, connectProducer } = require("./src/services/pubsub.service");
 
 const server = http.createServer(app);
 socket.init(server);
@@ -17,7 +17,7 @@ const startServer = async () => {
   try {
     await initDb();
 
-    // Initialize Kafka
+    // Initialize Redis Pub/Sub
     await connectProducer();
     await startConsumers();
 

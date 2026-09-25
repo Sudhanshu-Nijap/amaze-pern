@@ -104,4 +104,4 @@ The backend includes cron jobs for periodic price checking and daily data scrapi
 > Currently, the scheduler is **disabled** in `backend/src/jobs/cron.js`. To re-enable it, uncomment the `cron.schedule` calls.
 
 ## 📄 License
-ISC
+MIT

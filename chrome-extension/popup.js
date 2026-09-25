@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const trackBtn = document.getElementById('trackBtn');
     const messageEl = document.getElementById('message');
     
-    const AMAZE_FRONTEND_URL = 'http://localhost';
+    const AMAZE_FRONTEND_URL = 'https://amaze-omega.vercel.app';
 
     const showMessage = (msg, isError = false) => {
         messageEl.textContent = msg;

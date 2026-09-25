@@ -13,9 +13,9 @@ Amaze is a comprehensive product tracking and scraping application built with th
 ## 🛠️ Tech Stack
 
 - **Frontend**: React (Vite), Tailwind CSS, Socket.io-client, React Router (Deployed on Vercel).
-- **Backend**: Node.js, Express, Supabase (PostgreSQL), node-cron, Nodemailer, Socket.io (Deployed on Render).
-- **Database**: Supabase (PostgreSQL).
-- **Cache/Queue**: Redis (Render Key Value / Upstash).
+- **Backend**: Node.js, Express, PostgreSQL, node-cron, Nodemailer, Socket.io (Deployed on Render).
+- **Database**: PostgreSQL.
+- **Cache/Queue**: Redis (Render Key Value).
 
 ## 📁 Project Structure
 

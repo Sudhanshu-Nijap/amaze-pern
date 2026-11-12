@@ -15,8 +15,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // Token is invalid or expired, clear local storage and force a reload
+    // Only redirect to login if this was an authenticated request, not login/register itself!
+    const isAuthRoute = error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/register');
+    if (error.response && error.response.status === 401 && !isAuthRoute) {
       localStorage.removeItem('supabase_token');
       localStorage.removeItem('supabase_session');
       window.location.href = '/login';

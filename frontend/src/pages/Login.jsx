@@ -6,16 +6,29 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    setLoading(true);
     try {
       await login(email, password);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed');
+      console.error('Login error:', err);
+      const serverMsg = err.response?.data?.error || err.response?.data?.message;
+      if (serverMsg) {
+        setError(serverMsg);
+      } else if (err.message === 'Network Error') {
+        setError('Cannot connect to backend server. Please verify backend is running on port 5000.');
+      } else {
+        setError('Invalid email or password. Please try again.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -58,7 +71,9 @@ export default function Login() {
                   required 
                 />
               </div>
-              <button type="submit" className="btn btn-primary w-100 rounded-pill fw-bold mb-3">Sign In</button>
+              <button type="submit" disabled={loading} className="btn btn-primary w-100 rounded-pill fw-bold mb-3">
+                {loading ? 'Signing in...' : 'Sign In'}
+              </button>
               
               {/* Note: Google Login might require Supabase Auth specific implementation, 
                   leaving the layout as requested */}

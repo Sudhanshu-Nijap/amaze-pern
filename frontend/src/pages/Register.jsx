@@ -8,17 +8,34 @@ export default function Register() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    setSuccess('');
+    setSubmitting(true);
     try {
       await register(firstName, lastName, email, password);
-      alert('Registration successful! Please login.');
-      navigate('/login');
+      setSuccess('Account created successfully! Redirecting to login...');
+      setTimeout(() => {
+        navigate('/login');
+      }, 1500);
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed');
+      console.error('Registration error:', err);
+      const serverMsg = err.response?.data?.error || err.response?.data?.message;
+      if (serverMsg) {
+        setError(serverMsg);
+      } else if (err.message === 'Network Error') {
+        setError('Cannot connect to backend server. Please verify backend is running on port 5000.');
+      } else {
+        setError('Registration failed. Please check your details and try again.');
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -34,8 +51,15 @@ export default function Register() {
               Savings at Amazon!</h3>
             <form onSubmit={handleSubmit}>
               {error && (
-                <div className="alert alert-danger" role="alert">
-                  {error}
+                <div className="alert alert-danger py-2 px-3 small d-flex align-items-center" role="alert">
+                  <i className="fas fa-exclamation-circle me-2"></i>
+                  <div>{error}</div>
+                </div>
+              )}
+              {success && (
+                <div className="alert alert-success py-2 px-3 small d-flex align-items-center" role="alert">
+                  <i className="fas fa-check-circle me-2"></i>
+                  <div>{success}</div>
                 </div>
               )}
               <div className="mb-3 mt-3">
@@ -86,7 +110,9 @@ export default function Register() {
                   required 
                 />
               </div>
-              <button type="submit" className="btn btn-primary w-100 rounded-pill fw-bold mb-3">Create my account</button>
+              <button type="submit" disabled={submitting} className="btn btn-primary w-100 rounded-pill fw-bold mb-3">
+                {submitting ? 'Creating Account...' : 'Create my account'}
+              </button>
               
               <a href="#" className="btn-orange text-decoration-none w-100 rounded-pill fw-bold mb-3 d-flex align-items-center justify-content-center">
                 <i className="fab fa-google me-2"></i> Sign in with Google

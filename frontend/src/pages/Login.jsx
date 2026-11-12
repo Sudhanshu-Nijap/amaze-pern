@@ -33,14 +33,14 @@ export default function Login() {
   };
 
   return (
-    <div className="container d-flex align-items-center justify-content-center min-vh-100">
-      <div className="row w-100">
-        <div className="col-md-6 d-none d-md-flex justify-content-end align-items-end">
-          <img src="/img/camel.png" alt="Camel Mascot" className="img-fluid" style={{ maxHeight: '50vh' }} />
+    <div className="d-flex align-items-center justify-content-center py-4" style={{ minHeight: 'calc(100vh - 80px)' }}>
+      <div className="row w-100 align-items-center">
+        <div className="col-md-6 d-none d-md-flex justify-content-center align-items-center">
+          <img src="/img/camel.png" alt="Camel Mascot" className="img-fluid" style={{ maxHeight: '42vh', objectFit: 'contain' }} />
         </div>
         <div className="col-md-6 d-flex align-items-center justify-content-center">
-          <div className="form-container">
-            <h3 className="fw-bold mb-5">Sign in to Your <span className="title fw-bold">amaze</span> Account</h3>
+          <div className="form-container w-100" style={{ maxWidth: '440px' }}>
+            <h3 className="fw-bold mb-4">Sign in to Your <span className="title fw-bold">amaze</span> Account</h3>
             <form onSubmit={handleSubmit}>
               {error && (
                 <div className="alert alert-danger" role="alert">

@@ -40,15 +40,15 @@ export default function Register() {
   };
 
   return (
-    <div className="container d-flex align-items-center justify-content-center min-vh-100">
-      <div className="row w-100">
-        <div className="col-md-6 d-none d-md-flex justify-content-end align-items-end">
-          <img src="/img/camel.png" alt="Camel Mascot" className="img-fluid" style={{ maxHeight: '50vh' }} />
+    <div className="d-flex align-items-center justify-content-center py-4" style={{ minHeight: 'calc(100vh - 80px)' }}>
+      <div className="row w-100 align-items-center">
+        <div className="col-md-6 d-none d-md-flex justify-content-center align-items-center">
+          <img src="/img/camel.png" alt="Camel Mascot" className="img-fluid" style={{ maxHeight: '42vh', objectFit: 'contain' }} />
         </div>
         <div className="col-md-6 d-flex align-items-center justify-content-center">
-          <div className="form-container">
-            <h3 className="fw-bold">Create a FREE <span className="title fw-bold">amaze</span> Account <br /> and Boost Your
-              Savings at Amazon!</h3>
+          <div className="form-container w-100" style={{ maxWidth: '460px' }}>
+            <h3 className="fw-bold mb-3">Create a FREE <span className="title fw-bold">amaze</span> Account</h3>
+            <p className="text-muted small mb-3">Boost your savings with smart Amazon price tracking</p>
             <form onSubmit={handleSubmit}>
               {error && (
                 <div className="alert alert-danger py-2 px-3 small d-flex align-items-center" role="alert">
@@ -62,35 +62,37 @@ export default function Register() {
                   <div>{success}</div>
                 </div>
               )}
-              <div className="mb-3 mt-3">
-                <label className="form-label">First Name</label>
-                <input 
-                  type="text" 
-                  className="form-control border border-secondary rounded-pill"
-                  placeholder="Enter your first name" 
-                  name="first_name" 
-                  value={firstName}
-                  onChange={e => setFirstName(e.target.value)}
-                  required 
-                />
+              <div className="row g-2 mb-2">
+                <div className="col-6">
+                  <label className="form-label small mb-1 fw-medium">First Name</label>
+                  <input 
+                    type="text" 
+                    className="form-control form-control-sm border border-secondary rounded-pill px-3"
+                    placeholder="First name" 
+                    name="first_name" 
+                    value={firstName}
+                    onChange={e => setFirstName(e.target.value)}
+                    required 
+                  />
+                </div>
+                <div className="col-6">
+                  <label className="form-label small mb-1 fw-medium">Last Name</label>
+                  <input 
+                    type="text" 
+                    className="form-control form-control-sm border border-secondary rounded-pill px-3"
+                    placeholder="Last name" 
+                    name="last_name" 
+                    value={lastName}
+                    onChange={e => setLastName(e.target.value)}
+                    required 
+                  />
+                </div>
               </div>
-              <div className="mb-3">
-                <label className="form-label">Last Name</label>
-                <input 
-                  type="text" 
-                  className="form-control border border-secondary rounded-pill"
-                  placeholder="Enter your last name" 
-                  name="last_name" 
-                  value={lastName}
-                  onChange={e => setLastName(e.target.value)}
-                  required 
-                />
-              </div>
-              <div className="mb-3">
-                <label className="form-label">Email Address</label>
+              <div className="mb-2">
+                <label className="form-label small mb-1 fw-medium">Email Address</label>
                 <input 
                   type="email" 
-                  className="form-control border border-secondary rounded-pill"
+                  className="form-control form-control-sm border border-secondary rounded-pill px-3"
                   placeholder="Enter your email" 
                   name="email" 
                   value={email}
@@ -99,11 +101,11 @@ export default function Register() {
                 />
               </div>
               <div className="mb-3">
-                <label className="form-label">Password</label>
+                <label className="form-label small mb-1 fw-medium">Password</label>
                 <input 
                   type="password" 
-                  className="form-control border border-secondary rounded-pill"
-                  placeholder="Enter your password" 
+                  className="form-control form-control-sm border border-secondary rounded-pill px-3"
+                  placeholder="Create password" 
                   name="password" 
                   value={password}
                   onChange={e => setPassword(e.target.value)}

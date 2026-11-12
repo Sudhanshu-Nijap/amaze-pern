@@ -60,58 +60,80 @@ async function generateEmbedding(text) {
 }
 
 /**
- * Analyze an array of review strings and return an aggregate sentiment score and verdict.
+ * Analyze a single review string using Hugging Face model via Transformers.js
+ * Returns a normalized score from 0 (very negative) to 100 (very positive)
+ */
+async function analyzeSingleReview(reviewText) {
+  if (!reviewText || !reviewText.trim()) {
+    return { score: 50, label: 'medium' };
+  }
+
+  const analyzer = await getSentimentPipeline();
+  const text = reviewText.substring(0, 512);
+  const result = await analyzer(text);
+  const { label, score } = result[0];
+
+  // Normalized score: 0 to 100
+  let normalizedScore = label === 'POSITIVE' ? score * 100 : (1 - score) * 100;
+  normalizedScore = Math.max(0, Math.min(100, normalizedScore));
+
+  let category = 'medium';
+  if (normalizedScore >= 65) category = 'good';
+  else if (normalizedScore <= 35) category = 'bad';
+
+  return {
+    score: Number(normalizedScore.toFixed(2)),
+    category,
+    rawLabel: label,
+    rawConfidence: Number(score.toFixed(4))
+  };
+}
+
+/**
+ * Analyze an array of review strings and return aggregate sentiment:
+ * Calculates average sentiment score across all reviews and maps to bad, medium, or good.
  */
 async function analyzeReviews(reviews) {
   if (!reviews || reviews.length === 0) {
-    return { score: null, verdict: "No Reviews" };
+    return { score: null, verdict: "No Reviews", category: "medium", totalReviews: 0 };
   }
 
   try {
-    const analyzer = await getSentimentPipeline();
     let totalScore = 0;
-    
-    // Analyze each review
+    const reviewBreakdown = [];
+
     for (const review of reviews) {
-      // DistilBERT has a max length limit. Truncate safely.
-      const text = review.substring(0, 512); 
-      const result = await analyzer(text);
-      const { label, score } = result[0];
-      
-      // Calculate normalized positivity score (0 to 100)
-      if (label === 'POSITIVE') {
-        totalScore += score * 100;
-      } else {
-        totalScore += (1 - score) * 100;
-      }
+      const singleRes = await analyzeSingleReview(review);
+      totalScore += singleRes.score;
+      reviewBreakdown.push({
+        review: review.substring(0, 150),
+        score: singleRes.score,
+        category: singleRes.category
+      });
     }
 
-    const averagePositivity = totalScore / reviews.length;
-    
-    let verdict = "Mixed Feedback";
-    if (averagePositivity >= 75) verdict = "Highly Recommended";
-    else if (averagePositivity >= 60) verdict = "Good Product";
-    else if (averagePositivity <= 40) verdict = "Avoid";
-    else if (averagePositivity <= 25) verdict = "Terrible Product";
+    const avgScore = Number((totalScore / reviews.length).toFixed(2));
 
-    // Fake Review / Bot Spam heuristic
-    // If all reviews are overwhelmingly positive (>95) and very short, flag as Bot Spam
-    let isFake = false;
-    if (reviews.length >= 3 && averagePositivity > 90) {
-      const avgLength = reviews.reduce((acc, r) => acc + r.length, 0) / reviews.length;
-      if (avgLength < 50) {
-        verdict = "Suspicious (Possible Bot Spam)";
-        isFake = true;
-      }
+    // Map average score into 3 categories: bad, medium, good
+    let category = 'medium';
+    if (avgScore >= 65) {
+      category = 'good';
+    } else if (avgScore <= 35) {
+      category = 'bad';
     }
+
+    let verdict = category === 'good' ? 'Good' : (category === 'bad' ? 'Bad' : 'Medium');
 
     return {
-      score: averagePositivity.toFixed(2),
-      verdict: verdict
+      score: avgScore,
+      verdict,
+      category, // 'bad', 'medium', or 'good'
+      totalReviews: reviews.length,
+      breakdown: reviewBreakdown
     };
   } catch (error) {
     console.error("Error analyzing sentiment:", error);
-    return { score: null, verdict: "Analysis Failed" };
+    return { score: null, verdict: "Analysis Failed", category: "medium", totalReviews: 0 };
   }
 }
 
@@ -175,6 +197,7 @@ function generateProductChunks(productData, priceHistory = []) {
 
 module.exports = {
   generateEmbedding,
+  analyzeSingleReview,
   analyzeReviews,
   chatWithGroq,
   generateProductChunks

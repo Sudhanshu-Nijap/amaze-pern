@@ -1,7 +1,11 @@
 const { QdrantClient } = require('@qdrant/js-client-rest');
 const crypto = require('crypto');
 
-const client = new QdrantClient({ host: 'qdrant', port: 6333 });
+const client = new QdrantClient({ 
+  host: process.env.QDRANT_HOST || (process.env.NODE_ENV === 'production' ? 'qdrant' : '127.0.0.1'), 
+  port: parseInt(process.env.QDRANT_PORT || '6333', 10),
+  checkCompatibility: false 
+});
 
 const COLLECTION_NAME = 'product-chunks';
 

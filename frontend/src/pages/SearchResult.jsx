@@ -400,24 +400,82 @@ export default function SearchResult() {
                   </a>
                 </div>
 
-                {/* Sentiment Analysis Card */}
+                {/* Review Sentiment Overview */}
                 {product.sentiment && (
-                  <div className="p-3 bg-light rounded-3 border mb-3" style={{ borderColor: '#eef2f6' }}>
+                  <div className="card border rounded-3 p-3 bg-white mb-3 shadow-sm" style={{ borderColor: '#e5e7eb' }}>
                     <div className="d-flex justify-content-between align-items-center mb-2">
-                      <h6 className="fw-semibold mb-0 text-dark">Customer Sentiment</h6>
-                      {product.sentiment.score ? (
-                        <span className={`badge ${product.sentiment.score >= 75 ? 'bg-success' : product.sentiment.score >= 50 ? 'bg-primary' : 'bg-danger'} text-white rounded-1 px-2 py-1 small`}>
-                          {product.sentiment.score}% Positive
+                      <span className="fw-semibold text-dark fs-6">Customer Reviews Summary</span>
+                      {product.sentiment.category ? (
+                        <span className={`badge px-2.5 py-1 text-uppercase fw-semibold ${
+                          product.sentiment.category === 'good'
+                            ? 'bg-success text-white'
+                            : product.sentiment.category === 'medium'
+                            ? 'bg-warning text-dark'
+                            : 'bg-danger text-white'
+                        }`} style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                          {product.sentiment.category === 'good' ? 'Good' : product.sentiment.category === 'medium' ? 'Medium' : 'Bad'}
                         </span>
                       ) : (
-                        <span className="badge bg-secondary text-white rounded-1 px-2 py-1 small">
-                          No Reviews
-                        </span>
+                        <span className="badge bg-secondary text-white small">No Reviews</span>
                       )}
                     </div>
-                    <p className="text-secondary small mb-0">
-                      <strong>AI Verdict:</strong> {product.sentiment.verdict || "Insufficient data for sentiment analysis."}
-                    </p>
+
+                    <div className="d-flex align-items-baseline gap-2 mb-2">
+                      <span className="fs-4 fw-bold text-dark">
+                        {product.sentiment.score !== null ? `${product.sentiment.score}/100` : '—'}
+                      </span>
+                      <span className="text-muted small">
+                        overall rating from {product.sentiment.totalReviews || product.reviews?.length || 0} reviews
+                      </span>
+                    </div>
+
+                    {/* Progress distribution bar */}
+                    <div className="progress mb-3" style={{ height: '6px', backgroundColor: '#f1f5f9' }}>
+                      <div 
+                        className={`progress-bar ${
+                          product.sentiment.category === 'good'
+                            ? 'bg-success'
+                            : product.sentiment.category === 'medium'
+                            ? 'bg-warning'
+                            : 'bg-danger'
+                        }`} 
+                        role="progressbar" 
+                        style={{ width: `${Math.min(100, Math.max(0, product.sentiment.score || 0))}%` }}
+                      ></div>
+                    </div>
+
+                    <div className="d-flex justify-content-between text-muted" style={{ fontSize: '0.75rem' }}>
+                      <span className="text-danger fw-medium">Bad (0-35)</span>
+                      <span className="text-warning-emphasis fw-medium">Medium (36-64)</span>
+                      <span className="text-success fw-medium">Good (65-100)</span>
+                    </div>
+
+                    {/* Collapsible/Recent individual reviews if available */}
+                    {product.sentiment.breakdown && product.sentiment.breakdown.length > 0 && (
+                      <div className="mt-3 pt-2 border-top">
+                        <small className="text-muted fw-semibold d-block mb-2 text-uppercase" style={{ fontSize: '0.68rem', letterSpacing: '0.5px' }}>
+                          Sample Reviews & Ratings
+                        </small>
+                        <div className="d-flex flex-column gap-2" style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                          {product.sentiment.breakdown.map((rev, idx) => (
+                            <div key={idx} className="p-2 rounded border bg-light bg-opacity-50" style={{ borderColor: '#f1f5f9' }}>
+                              <div className="d-flex justify-content-between align-items-center mb-1">
+                                <span className={`badge ${
+                                  rev.category === 'good' ? 'bg-success-subtle text-success border border-success-subtle' :
+                                  rev.category === 'medium' ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' :
+                                  'bg-danger-subtle text-danger border border-danger-subtle'
+                                } px-1.5 py-0.5`} style={{ fontSize: '0.7rem' }}>
+                                  {rev.category.toUpperCase()} ({rev.score})
+                                </span>
+                              </div>
+                              <p className="text-secondary small mb-0" style={{ fontSize: '0.78rem', lineHeight: '1.3' }}>
+                                "{rev.review}..."
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

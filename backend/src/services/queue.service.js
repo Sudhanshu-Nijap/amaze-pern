@@ -29,11 +29,13 @@ const scrapeWorker = new Worker('scrape-jobs', async (job) => {
     throw new Error(productData.error);
   }
   
-  // Run sentiment analysis immediately in the background
-  if (productData) {
+  // Process reviews one-by-one with Hugging Face model and calculate average sentiment
+  if (productData && Array.isArray(productData.reviews)) {
     try {
-      const sentimentResult = await aiService.analyzeReviews(productData.reviews || []);
+      console.log(`[Worker] Processing ${productData.reviews.length} reviews for sentiment analysis...`);
+      const sentimentResult = await aiService.analyzeReviews(productData.reviews);
       productData.sentiment = sentimentResult;
+      console.log(`[Worker] Sentiment computed: Avg score ${sentimentResult.score}, Category: ${sentimentResult.category}`);
     } catch (err) {
       console.error(`[Worker] Error analyzing sentiment for job ${job.id}:`, err);
     }

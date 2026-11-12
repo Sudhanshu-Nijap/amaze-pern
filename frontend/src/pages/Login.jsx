@@ -74,12 +74,6 @@ export default function Login() {
               <button type="submit" disabled={loading} className="btn btn-primary w-100 rounded-pill fw-bold mb-3">
                 {loading ? 'Signing in...' : 'Sign In'}
               </button>
-              
-              {/* Note: Google Login might require Supabase Auth specific implementation, 
-                  leaving the layout as requested */}
-              <a href="#" className="btn-orange text-decoration-none w-100 rounded-pill fw-bold mb-3 d-flex align-items-center justify-content-center">
-                <i className="fab fa-google me-2"></i> Sign in with Google
-              </a>
 
               <p className="text-center mt-2">
                 Don't have an account?

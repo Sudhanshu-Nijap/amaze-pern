@@ -113,10 +113,6 @@ export default function Register() {
               <button type="submit" disabled={submitting} className="btn btn-primary w-100 rounded-pill fw-bold mb-3">
                 {submitting ? 'Creating Account...' : 'Create my account'}
               </button>
-              
-              <a href="#" className="btn-orange text-decoration-none w-100 rounded-pill fw-bold mb-3 d-flex align-items-center justify-content-center">
-                <i className="fab fa-google me-2"></i> Sign in with Google
-              </a>
 
               <p className="text-center mt-2">
                 Already have an account? <Link to="/login" className="text-primary text-decoration-none">Sign in to your amaze account</Link>

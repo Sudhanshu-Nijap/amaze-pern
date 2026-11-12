@@ -138,17 +138,18 @@ async function analyzeReviews(reviews) {
 }
 
 /**
- * Chat with Groq API using provided context for RAG
+ * Chat with Groq API using provided context strictly from PostgreSQL database.
+ * The model will ONLY answer based on the database information provided.
  */
 async function chatWithGroq(userMessage, productContext) {
   try {
-    const systemPrompt = `You are an AI Gift Concierge and shopping assistant for Amaze, a smart price-tracking app. 
-You help users find the perfect gifts and products based on the context provided about the items they are tracking.
-If a user asks for a recommendation (e.g., "Find me a gift for a 12-year-old"), use the context to suggest the best matching products.
-Keep your answers helpful, concise, and engaging (2-3 sentences maximum).
-If no context information is provided or no products match, reply simply: "I don't have any matching products in your tracker right now. Please tell me which products you are tracking."
+    const systemPrompt = `You are the Amaze Database Product Concierge.
+CRITICAL CONSTRAINT: You ONLY answer using the exact database information provided in the Context Information section below. Do NOT use any external knowledge, do NOT invent or hallucinate products, prices, or specs.
+- If the user asks about a product, price, review, deals, or tracking information that is in the Context, provide accurate answers based solely on that data.
+- If the requested product or information is NOT present in the Context Information, you must reply: "I can only provide information on products currently in our database. That product is not in our database."
+- Keep your answers helpful, concise, and clear (2-4 sentences maximum).
 
-Context Information:
+Context Information from Database:
 ${productContext}
 `;
 
@@ -157,8 +158,8 @@ ${productContext}
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage }
       ],
-      model: "gemma-7b-it", // Updated to a currently supported Groq model
-      temperature: 0.5,
+      model: "llama-3.3-70b-versatile", // Fast and highly accurate instruction-following model
+      temperature: 0.2, // Low temperature for high factual accuracy strictly grounded in context
       max_tokens: 500,
     });
 

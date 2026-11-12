@@ -91,7 +91,6 @@ const calculatePredictiveAnalysis = (currentPrice, historyPrices = [], initialPr
 };
 
 const { scrapeQueue } = require('../services/queue.service');
-const qdrantService = require('../services/qdrant.service');
 
 // Matches 'amazon_product_view' (POST /search/)
 const searchProduct = async (req, res) => {
@@ -382,28 +381,6 @@ const trackProduct = async (req, res) => {
         new Date()
       ]
     );
-
-    // 4. Update Document Chunks for RAG
-    const priceRes = await query("SELECT price, timestamp as recorded_at FROM scraper_pricehistory WHERE product_id = $1 ORDER BY timestamp ASC", [product.id]);
-    const priceRows = priceRes.rows;
-
-    // Run heavy embedding generation in the background so it doesn't block the UI
-    (async () => {
-      try {
-        const priceHistoryForRAG = priceRows.map(row => ({ price: row.price, timestamp: row.recorded_at }));
-        const productChunks = aiService.generateProductChunks(product, priceHistoryForRAG);
-
-        if (productChunks && productChunks.length > 0) {
-          const embeddings = await Promise.all(
-            productChunks.map(chunk => aiService.generateEmbedding(chunk.content))
-          );
-          
-          await qdrantService.upsertChunks(product.id, product.title, productChunks, embeddings);
-        }
-      } catch (err) {
-        console.error("Failed to push to Qdrant in background:", err);
-      }
-    })();
 
     res.status(200).json({ message: "Product tracked successfully", product });
   } catch (error) {

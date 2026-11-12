@@ -21,13 +21,6 @@ services:
     ports:
       - "6379:6379"
 
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: amaze_qdrant
-    restart: always
-    ports:
-      - "6333:6333"
-
 
   backend:
     build:
